@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import mongoose from "mongoose";
 import { hash } from "bcryptjs";
 

@@ -2,19 +2,17 @@ import { Suspense } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { ShopFilters } from "@/components/shop/ShopFilters";
 import { IProduct } from "@/types";
+import { connectDB } from "@/lib/mongoose";
+import { Product } from "@/models/Product";
 
 async function getProducts(category?: string, search?: string) {
   try {
-    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const params = new URLSearchParams();
-    if (category && category !== "all") params.set("category", category);
-    if (search) params.set("search", search);
-    params.set("limit", "24");
-    const res = await fetch(`${baseUrl}/api/products?${params}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return { products: [], total: 0 };
-    return await res.json();
+    await connectDB();
+    const query: Record<string, any> = {};
+    if (category && category !== "all") query.category = category;
+    if (search) query.name = { $regex: search, $options: "i" };
+    const products = await Product.find(query).limit(24).lean();
+    return { products, total: products.length };
   } catch {
     return { products: [], total: 0 };
   }
@@ -58,7 +56,7 @@ export default async function ShopPage({
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-24">
-            {products.map((product: IProduct) => (
+            {products.map((product: any) => (
               <ProductCard key={product._id} product={product} />
             ))}
           </div>
