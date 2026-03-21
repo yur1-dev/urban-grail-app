@@ -1,11 +1,12 @@
 "use client";
+import { Suspense } from "react";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || null;
@@ -56,7 +57,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Email */}
           <div>
             <label className="block text-xs tracking-[3px] uppercase text-[#5a5a5a] mb-2">
               Email
@@ -71,7 +71,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password + eye */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs tracking-[3px] uppercase text-[#5a5a5a]">
@@ -121,16 +120,21 @@ export default function LoginPage() {
             Register here
           </Link>
         </p>
-
-        {/* <div className="mt-8 border border-[#1e1e1e] p-4 bg-[#111111]">
-          <p className="text-xs text-[#5a5a5a] uppercase tracking-wider mb-1">
-            Test accounts
-          </p>
-          <p className="text-xs text-[#5a5a5a]">
-            Admin: admin@urbangrail.com / admin123
-          </p>
-        </div> */}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen pt-24 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
