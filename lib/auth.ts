@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { connectDB } from "./mongoose";
-import { User } from "@/models/User";
+import { User, IUser } from "@/models/User";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -14,9 +14,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
         await connectDB();
-        const user = (await User.findOne({
+        const user = await User.findOne<IUser>({
           email: credentials.email,
-        }).lean()) as any;
+        }).lean();
         if (!user) return null;
         const isValid = await compare(
           credentials.password as string,
@@ -24,7 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
         if (!isValid) return null;
         return {
-          id: user._id.toString(),
+          id: (user._id as any).toString(),
           email: user.email,
           name: user.name,
           role: user.role,

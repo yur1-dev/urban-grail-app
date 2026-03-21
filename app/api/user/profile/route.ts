@@ -10,7 +10,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { name } = await req.json();
-
     if (!name?.trim())
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     if (name.trim().length < 3)
@@ -18,7 +17,7 @@ export async function PATCH(req: NextRequest) {
 
     await connectDB();
     const user = session.user as any;
-    await User.findByIdAndUpdate(user.id, { name: name.trim() });
+    await User.findByIdAndUpdate(user.id, { name: name.trim() }, { new: true });
 
     return NextResponse.json({ message: "Profile updated" });
   } catch (err) {

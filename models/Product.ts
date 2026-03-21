@@ -1,6 +1,35 @@
-import { Schema, model, models } from "mongoose";
+import { Schema, model, models, Document, Model, Types } from "mongoose";
 
-const ReviewSchema = new Schema(
+export interface IReview {
+  user: Types.ObjectId;
+  name: string;
+  rating: number;
+  comment: string;
+}
+
+export interface IProduct extends Document {
+  name: string;
+  description: string;
+  price: number;
+  images: string[];
+  category:
+    | "tees"
+    | "hoodies"
+    | "pants"
+    | "caps"
+    | "accessories"
+    | "shoes"
+    | "bags"
+    | "slippers";
+  sizes: string[];
+  stock: number;
+  featured: boolean;
+  reviews: IReview[];
+  rating: number;
+  numReviews: number;
+}
+
+const ReviewSchema = new Schema<IReview>(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     name: { type: String, required: true },
@@ -10,7 +39,7 @@ const ReviewSchema = new Schema(
   { timestamps: true },
 );
 
-const ProductSchema = new Schema(
+const ProductSchema = new Schema<IProduct>(
   {
     name: { type: String, required: true, trim: true },
     description: { type: String, required: true },
@@ -59,4 +88,5 @@ const ProductSchema = new Schema(
   { timestamps: true },
 );
 
-export const Product = models.Product || model("Product", ProductSchema);
+export const Product: Model<IProduct> =
+  models.Product || model<IProduct>("Product", ProductSchema);

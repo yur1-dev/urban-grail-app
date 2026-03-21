@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { connectDB } from "@/lib/mongoose";
-import { User } from "@/models/User";
+import { User, IUser } from "@/models/User";
 
 export const resetOtpStore = new Map<
   string,
@@ -19,9 +19,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
 
     await connectDB();
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne<IUser>({ email: email.toLowerCase() });
     if (!user) {
-      // Don't reveal if email exists — security best practice
       return NextResponse.json({
         message: "If that email exists, a code has been sent.",
       });
