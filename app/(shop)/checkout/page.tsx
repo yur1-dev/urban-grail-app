@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,7 +14,6 @@ import {
   Truck,
 } from "lucide-react";
 
-// ─── Validation helpers ───────────────────────────────────────────────────────
 const PHILIPPINE_REGIONS = [
   "Metro Manila",
   "NCR",
@@ -70,7 +70,6 @@ function validateName(name: string): string | null {
   return null;
 }
 
-// ─── Field component ─────────────────────────────────────────────────────────
 function Field({
   label,
   error,
@@ -99,8 +98,7 @@ function Field({
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-export default function CheckoutPage() {
+function CheckoutContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -123,52 +121,36 @@ export default function CheckoutPage() {
     agreeToTerms: false,
   });
 
-  // ── Field-level errors ──────────────────────────────────────────────────────
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = useCallback(() => {
     const e: Record<string, string> = {};
-
     const nameErr = validateName(form.recipientName);
     if (nameErr) e.recipientName = nameErr;
-
     if (!form.address.trim()) e.address = "Street address is required";
     else if (form.address.trim().length < 5)
       e.address = "Please enter your street/house number";
-
     if (!form.barangay.trim()) e.barangay = "Barangay is required";
     if (!form.city.trim()) e.city = "City/Municipality is required";
     if (!form.province.trim()) e.province = "Province is required";
-
     if (!form.zipCode.trim()) e.zipCode = "ZIP code is required";
     else if (!/^\d{4}$/.test(form.zipCode.trim()))
       e.zipCode = "ZIP code must be 4 digits";
-
     const phoneErr = validatePhone(form.phone);
     if (phoneErr) e.phone = phoneErr;
-
     if (form.altPhone.trim()) {
       const altErr = validatePhone(form.altPhone);
       if (altErr) e.altPhone = altErr;
     }
-
-    if (paymentMethod === "online" && !form.agreeToTerms) {
-      e.agreeToTerms = "You must agree to continue with online payment";
-    }
-
-    if (!form.agreeToTerms) {
+    if (!form.agreeToTerms)
       e.agreeToTerms = "You must agree to the terms to place your order";
-    }
-
     return e;
   }, [form, paymentMethod]);
 
-  // ── Live validation after first attempt ─────────────────────────────────────
   useEffect(() => {
     if (submitAttempted) setErrors(validate());
   }, [form, submitAttempted, validate]);
 
-  // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (status === "unauthenticated")
       router.push("/login?callbackUrl=/checkout");
@@ -196,7 +178,6 @@ export default function CheckoutPage() {
   if (items.length === 0) return null;
 
   const user = session?.user as any;
-
   const fullAddress = [
     form.address,
     form.barangay,
@@ -207,23 +188,19 @@ export default function CheckoutPage() {
     .filter(Boolean)
     .join(", ");
 
-  // ── Submit ──────────────────────────────────────────────────────────────────
   async function handleOrder(e: React.FormEvent) {
     e.preventDefault();
     setSubmitAttempted(true);
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
-      // Scroll to first error
       const firstKey = Object.keys(errs)[0];
       document
         .getElementById(firstKey)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-
     setLoading(true);
-
     try {
       const orderRes = await fetch("/api/orders", {
         method: "POST",
@@ -245,7 +222,6 @@ export default function CheckoutPage() {
           recipientName: form.recipientName,
         }),
       });
-
       if (!orderRes.ok) {
         const d = await orderRes.json();
         setErrors({
@@ -254,9 +230,7 @@ export default function CheckoutPage() {
         setLoading(false);
         return;
       }
-
       const order = await orderRes.json();
-
       if (paymentMethod === "online") {
         const payRes = await fetch("/api/payment/create", {
           method: "POST",
@@ -268,7 +242,6 @@ export default function CheckoutPage() {
             customerEmail: user?.email || "",
           }),
         });
-
         if (!payRes.ok) {
           setErrors({
             global: "GCash payment setup failed. Please try COD instead.",
@@ -276,20 +249,16 @@ export default function CheckoutPage() {
           setLoading(false);
           return;
         }
-
         const payData = await payRes.json();
-
         await fetch(`/api/orders/${order._id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ xenditInvoiceUrl: payData.invoiceUrl }),
         });
-
         clearCart();
         window.location.href = payData.invoiceUrl;
         return;
       }
-
       clearCart();
       router.push("/account?success=1");
     } catch {
@@ -301,12 +270,9 @@ export default function CheckoutPage() {
   const inputClass = (field: string) =>
     `w-full bg-[#111111] border ${errors[field] ? "border-red-500" : "border-[#1e1e1e]"} text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors`;
 
-  const isFormReady = Object.keys(validate()).length === 0;
-
   return (
     <div className="min-h-screen pt-24 px-6 pb-24">
       <div className="max-w-5xl mx-auto py-10">
-        {/* Header */}
         <p className="text-xs tracking-[5px] text-[#c9a84c] uppercase mb-3">
           Almost There
         </p>
@@ -321,7 +287,6 @@ export default function CheckoutPage() {
           </span>
         </div>
 
-        {/* Global error */}
         {errors.global && (
           <div className="border border-red-800 bg-red-900/20 text-red-400 text-xs p-4 mb-6 flex items-start gap-3">
             <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
@@ -331,7 +296,7 @@ export default function CheckoutPage() {
 
         <div className="grid lg:grid-cols-[1fr_380px] gap-12">
           <form onSubmit={handleOrder} className="space-y-8" noValidate>
-            {/* ── Section 1: Recipient ───────────────────────────────── */}
+            {/* Section 1: Recipient */}
             <div className="border border-[#1e1e1e] p-6 space-y-5">
               <div className="flex items-center gap-3 mb-2">
                 <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -341,7 +306,6 @@ export default function CheckoutPage() {
                   Recipient Info
                 </h2>
               </div>
-
               <Field label="Full Name" error={errors.recipientName} required>
                 <input
                   id="recipientName"
@@ -356,7 +320,6 @@ export default function CheckoutPage() {
                   autoComplete="name"
                 />
               </Field>
-
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Mobile Number" error={errors.phone} required>
                   <input
@@ -373,7 +336,6 @@ export default function CheckoutPage() {
                     autoComplete="tel"
                   />
                 </Field>
-
                 <Field label="Alt. Number (optional)" error={errors.altPhone}>
                   <input
                     id="altPhone"
@@ -390,7 +352,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* ── Section 2: Delivery Address ────────────────────────── */}
+            {/* Section 2: Address */}
             <div className="border border-[#1e1e1e] p-6 space-y-5">
               <div className="flex items-center gap-3 mb-2">
                 <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -400,7 +362,6 @@ export default function CheckoutPage() {
                   Delivery Address
                 </h2>
               </div>
-
               <Field label="House No. / Street" error={errors.address} required>
                 <input
                   id="address"
@@ -415,7 +376,6 @@ export default function CheckoutPage() {
                   autoComplete="address-line1"
                 />
               </Field>
-
               <Field label="Barangay" error={errors.barangay} required>
                 <input
                   id="barangay"
@@ -429,7 +389,6 @@ export default function CheckoutPage() {
                   placeholder="Barangay San Antonio"
                 />
               </Field>
-
               <div className="grid grid-cols-2 gap-4">
                 <Field label="City / Municipality" error={errors.city} required>
                   <input
@@ -443,7 +402,6 @@ export default function CheckoutPage() {
                     autoComplete="address-level2"
                   />
                 </Field>
-
                 <Field
                   label="Province / Region"
                   error={errors.province}
@@ -463,7 +421,6 @@ export default function CheckoutPage() {
                   />
                 </Field>
               </div>
-
               <Field label="ZIP Code" error={errors.zipCode} required>
                 <input
                   id="zipCode"
@@ -483,8 +440,6 @@ export default function CheckoutPage() {
                   autoComplete="postal-code"
                 />
               </Field>
-
-              {/* Address preview */}
               {fullAddress.length > 10 &&
                 !errors.address &&
                 !errors.barangay &&
@@ -503,7 +458,6 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 )}
-
               <Field label="Order Notes (optional)" error={errors.notes}>
                 <input
                   type="text"
@@ -519,7 +473,7 @@ export default function CheckoutPage() {
               </Field>
             </div>
 
-            {/* ── Section 3: Payment ─────────────────────────────────── */}
+            {/* Section 3: Payment */}
             <div className="border border-[#1e1e1e] p-6 space-y-5">
               <div className="flex items-center gap-3 mb-2">
                 <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -529,17 +483,11 @@ export default function CheckoutPage() {
                   Payment Method
                 </h2>
               </div>
-
               <div className="grid grid-cols-2 gap-3">
-                {/* COD */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("cod")}
-                  className={`py-5 px-4 border text-left transition-all relative ${
-                    paymentMethod === "cod"
-                      ? "border-[#c9a84c] bg-[#c9a84c]/5"
-                      : "border-[#1e1e1e] hover:border-[#3a3a3a]"
-                  }`}
+                  className={`py-5 px-4 border text-left transition-all relative ${paymentMethod === "cod" ? "border-[#c9a84c] bg-[#c9a84c]/5" : "border-[#1e1e1e] hover:border-[#3a3a3a]"}`}
                 >
                   {paymentMethod === "cod" && (
                     <CheckCircle2
@@ -557,16 +505,10 @@ export default function CheckoutPage() {
                     Pay when you receive
                   </span>
                 </button>
-
-                {/* GCash */}
                 <button
                   type="button"
                   onClick={() => setPaymentMethod("online")}
-                  className={`py-5 px-4 border text-left transition-all relative ${
-                    paymentMethod === "online"
-                      ? "border-[#c9a84c] bg-[#c9a84c]/5"
-                      : "border-[#1e1e1e] hover:border-[#3a3a3a]"
-                  }`}
+                  className={`py-5 px-4 border text-left transition-all relative ${paymentMethod === "online" ? "border-[#c9a84c] bg-[#c9a84c]/5" : "border-[#1e1e1e] hover:border-[#3a3a3a]"}`}
                 >
                   {paymentMethod === "online" && (
                     <CheckCircle2
@@ -585,7 +527,6 @@ export default function CheckoutPage() {
                   </span>
                 </button>
               </div>
-
               {paymentMethod === "cod" && (
                 <div className="border border-yellow-500/20 bg-yellow-500/5 p-4">
                   <p className="text-xs text-yellow-400 font-bold tracking-widest uppercase mb-1">
@@ -600,7 +541,6 @@ export default function CheckoutPage() {
                   </ul>
                 </div>
               )}
-
               {paymentMethod === "online" && (
                 <div className="border border-[#c9a84c]/20 bg-[#c9a84c]/5 p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -621,7 +561,7 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* ── Terms checkbox ─────────────────────────────────────── */}
+            {/* Terms */}
             <div className="space-y-3">
               <label
                 className={`flex items-start gap-3 cursor-pointer group ${errors.agreeToTerms ? "text-red-400" : "text-[#5a5a5a]"}`}
@@ -667,7 +607,7 @@ export default function CheckoutPage() {
               )}
             </div>
 
-            {/* ── Submit ─────────────────────────────────────────────── */}
+            {/* Submit */}
             <div className="space-y-3">
               {submitAttempted && Object.keys(errors).length > 0 && (
                 <div className="flex items-center gap-2 border border-red-800 bg-red-900/10 p-3">
@@ -682,7 +622,6 @@ export default function CheckoutPage() {
                   </p>
                 </div>
               )}
-
               <button
                 type="submit"
                 disabled={loading}
@@ -708,21 +647,19 @@ export default function CheckoutPage() {
                   </>
                 )}
               </button>
-
               <p className="text-center text-[#3a3a3a] text-[10px] tracking-widest uppercase">
                 By placing this order you agree to our terms
               </p>
             </div>
           </form>
 
-          {/* ── Order Summary ───────────────────────────────────────── */}
+          {/* Order Summary */}
           <div className="space-y-4">
             <div className="border border-[#1e1e1e] p-6 sticky top-24">
               <h3 className="text-xs tracking-[4px] uppercase text-[#5a5a5a] mb-6">
                 Order Summary ({items.reduce((s, i) => s + i.quantity, 0)}{" "}
                 items)
               </h3>
-
               <div className="space-y-4 mb-6 max-h-64 overflow-y-auto pr-1">
                 {items.map((item) => (
                   <div
@@ -760,7 +697,6 @@ export default function CheckoutPage() {
                   </div>
                 ))}
               </div>
-
               <div className="border-t border-[#1e1e1e] pt-4 space-y-2">
                 <div className="flex justify-between text-xs text-[#5a5a5a]">
                   <span>Subtotal</span>
@@ -785,8 +721,6 @@ export default function CheckoutPage() {
                   </span>
                 </div>
               </div>
-
-              {/* Trust badges */}
               <div className="mt-6 pt-4 border-t border-[#1e1e1e] grid grid-cols-3 gap-2">
                 {[
                   { icon: "🔒", label: "Secure" },
@@ -809,5 +743,19 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen pt-24 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   );
 }

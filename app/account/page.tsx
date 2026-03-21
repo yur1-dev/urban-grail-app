@@ -1,4 +1,5 @@
 "use client";
+import { Suspense } from "react";
 import { useEffect, useState, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -22,7 +23,6 @@ import {
   Shield,
 } from "lucide-react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type Tab = "orders" | "profile" | "security" | "notifications";
 
 const STATUS_STEPS = ["pending", "processing", "shipped", "delivered"];
@@ -41,7 +41,6 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   cancelled: <XCircle size={13} />,
 };
 
-// ─── Small helpers ────────────────────────────────────────────────────────────
 function Toast({ msg, type }: { msg: string; type: "success" | "error" }) {
   return (
     <div
@@ -105,7 +104,7 @@ function InputField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full bg-[#0a0a0a] border ${error ? "border-red-500" : "border-[#1e1e1e]"} text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors pr-${rightEl ? "12" : "4"}`}
+          className={`w-full bg-[#0a0a0a] border ${error ? "border-red-500" : "border-[#1e1e1e]"} text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors ${rightEl ? "pr-12" : "pr-4"}`}
         />
         {rightEl && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -126,7 +125,6 @@ function InputField({
   );
 }
 
-// ─── Orders Tab ───────────────────────────────────────────────────────────────
 function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -171,8 +169,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           </div>
         </div>
       )}
-
-      {/* Filter tabs */}
       <div className="flex gap-2 mb-6 flex-wrap">
         {[
           "all",
@@ -185,11 +181,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`px-4 py-1.5 text-[10px] tracking-[3px] uppercase border transition-colors ${
-              filter === s
-                ? "border-[#c9a84c] text-[#c9a84c]"
-                : "border-[#1e1e1e] text-[#5a5a5a] hover:border-[#3a3a3a]"
-            }`}
+            className={`px-4 py-1.5 text-[10px] tracking-[3px] uppercase border transition-colors ${filter === s ? "border-[#c9a84c] text-[#c9a84c]" : "border-[#1e1e1e] text-[#5a5a5a] hover:border-[#3a3a3a]"}`}
           >
             {s}
             {s !== "all" && orders.filter((o) => o.status === s).length > 0 && (
@@ -200,7 +192,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           </button>
         ))}
       </div>
-
       {filtered.length === 0 ? (
         <div className="border border-[#1e1e1e] p-16 text-center">
           <Package
@@ -230,17 +221,14 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                 key={order._id}
                 className="border border-[#1e1e1e] overflow-hidden hover:border-[#2a2a2a] transition-colors"
               >
-                {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e1e] bg-[#111111]">
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <p className="font-mono text-xs text-[#5a5a5a]">
-                        #{order._id.slice(-8).toUpperCase()}
-                      </p>
-                      <p className="text-[10px] text-[#3a3a3a] mt-0.5">
-                        {formatDate(order.createdAt)}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="font-mono text-xs text-[#5a5a5a]">
+                      #{order._id.slice(-8).toUpperCase()}
+                    </p>
+                    <p className="text-[10px] text-[#3a3a3a] mt-0.5">
+                      {formatDate(order.createdAt)}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span
@@ -254,8 +242,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </span>
                   </div>
                 </div>
-
-                {/* Progress bar */}
                 {!isCancelled && (
                   <div className="px-5 py-4 border-b border-[#1e1e1e]">
                     <div className="flex items-center">
@@ -277,11 +263,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                               {i < stepIndex ? "✓" : i + 1}
                             </div>
                             <span
-                              className={`text-[9px] tracking-widest uppercase whitespace-nowrap ${
-                                i <= stepIndex
-                                  ? "text-[#c9a84c]"
-                                  : "text-[#2a2a2a]"
-                              }`}
+                              className={`text-[9px] tracking-widest uppercase whitespace-nowrap ${i <= stepIndex ? "text-[#c9a84c]" : "text-[#2a2a2a]"}`}
                             >
                               {step}
                             </span>
@@ -296,7 +278,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </div>
                   </div>
                 )}
-
                 {isCancelled && (
                   <div className="px-5 py-3 border-b border-[#1e1e1e] bg-red-900/5 flex items-center gap-2">
                     <XCircle size={13} className="text-red-400" />
@@ -305,8 +286,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </p>
                   </div>
                 )}
-
-                {/* Items */}
                 <div className="p-5 space-y-3">
                   {order.items?.map((item: any, i: number) => (
                     <div key={i} className="flex gap-3 items-center">
@@ -333,8 +312,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </div>
                   ))}
                 </div>
-
-                {/* Footer */}
                 <div className="px-5 py-3 border-t border-[#1e1e1e] bg-[#111111] flex flex-wrap justify-between gap-2 text-[10px] text-[#5a5a5a]">
                   <span>
                     Payment:{" "}
@@ -358,7 +335,6 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
   );
 }
 
-// ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({
   user,
   onToast,
@@ -412,10 +388,8 @@ function ProfileTab({
     <div className="space-y-8">
       <div className="border border-[#1e1e1e] p-6">
         <SectionTitle>Personal Information</SectionTitle>
-
-        {/* Avatar */}
         <div className="flex items-center gap-5 mb-8">
-          <div className="w-16 h-16 bg-[#c9a84c] flex items-center justify-center text-[#0a0a0a] text-2xl font-black rounded-none">
+          <div className="w-16 h-16 bg-[#c9a84c] flex items-center justify-center text-[#0a0a0a] text-2xl font-black">
             {(user?.name || "U").charAt(0).toUpperCase()}
           </div>
           <div>
@@ -426,7 +400,6 @@ function ProfileTab({
             </span>
           </div>
         </div>
-
         <div className="space-y-5">
           <InputField
             label="Full Name"
@@ -449,14 +422,12 @@ function ProfileTab({
               ) : null
             }
           />
-
           <InputField
             label="Email Address"
             value={email}
             onChange={() => {}}
             hint="Email cannot be changed. Contact support if needed."
           />
-
           <div className="border border-[#1e1e1e] p-4 bg-[#0a0a0a]">
             <p className="text-[10px] tracking-[3px] uppercase text-[#5a5a5a] mb-2">
               Account Created
@@ -464,7 +435,6 @@ function ProfileTab({
             <p className="text-sm text-white">{formatDate(new Date())}</p>
           </div>
         </div>
-
         {editing && (
           <div className="flex gap-3 mt-6">
             <button
@@ -487,8 +457,6 @@ function ProfileTab({
           </div>
         )}
       </div>
-
-      {/* Danger zone */}
       <div className="border border-red-900/40 p-6">
         <SectionTitle>Danger Zone</SectionTitle>
         <div className="flex items-center justify-between">
@@ -513,7 +481,6 @@ function ProfileTab({
   );
 }
 
-// ─── Security Tab ─────────────────────────────────────────────────────────────
 function SecurityTab({
   onToast,
 }: {
@@ -555,7 +522,6 @@ function SecurityTab({
     if (/[^A-Za-z0-9]/.test(p)) s++;
     return s;
   })();
-
   const strengthLabel = [
     "",
     "Very Weak",
@@ -611,7 +577,6 @@ function SecurityTab({
 
   return (
     <div className="space-y-6">
-      {/* Change password */}
       <div className="border border-[#1e1e1e] p-6">
         <SectionTitle>Change Password</SectionTitle>
         <form onSubmit={handleChange} className="space-y-5" noValidate>
@@ -633,7 +598,6 @@ function SecurityTab({
               </button>
             }
           />
-
           <div>
             <InputField
               label="New Password"
@@ -671,7 +635,6 @@ function SecurityTab({
               </div>
             )}
           </div>
-
           <InputField
             label="Confirm New Password"
             type={showConf ? "text" : "password"}
@@ -690,8 +653,6 @@ function SecurityTab({
               </button>
             }
           />
-
-          {/* Password requirements */}
           <div className="border border-[#1e1e1e] p-4 bg-[#0a0a0a] space-y-2">
             <p className="text-[10px] tracking-[3px] uppercase text-[#5a5a5a] mb-3">
               Password Requirements
@@ -730,7 +691,6 @@ function SecurityTab({
               </div>
             ))}
           </div>
-
           <button
             type="submit"
             disabled={loading}
@@ -740,8 +700,6 @@ function SecurityTab({
           </button>
         </form>
       </div>
-
-      {/* Security info */}
       <div className="border border-[#1e1e1e] p-6">
         <SectionTitle>Account Security</SectionTitle>
         <div className="space-y-4">
@@ -776,8 +734,6 @@ function SecurityTab({
           ))}
         </div>
       </div>
-
-      {/* Sign out all */}
       <div className="border border-[#1e1e1e] p-6">
         <SectionTitle>Sessions</SectionTitle>
         <div className="flex items-center justify-between">
@@ -799,7 +755,6 @@ function SecurityTab({
   );
 }
 
-// ─── Notifications Tab ────────────────────────────────────────────────────────
 function NotificationsTab({
   onToast,
 }: {
@@ -812,16 +767,9 @@ function NotificationsTab({
     smsUpdates: false,
     deliveryAlerts: true,
   });
-  const [saved, setSaved] = useState(false);
 
   function toggle(key: keyof typeof prefs) {
     setPrefs((p) => ({ ...p, [key]: !p[key] }));
-    setSaved(false);
-  }
-
-  async function handleSave() {
-    setSaved(true);
-    onToast("Notification preferences saved", "success");
   }
 
   const items = [
@@ -876,9 +824,7 @@ function NotificationsTab({
             </div>
             <div
               onClick={() => !required && toggle(key as keyof typeof prefs)}
-              className={`relative flex-shrink-0 transition-colors ${
-                required ? "opacity-60 cursor-not-allowed" : "cursor-pointer"
-              } ${prefs[key as keyof typeof prefs] ? "bg-[#c9a84c]" : "bg-[#2a2a2a]"}`}
+              className={`relative flex-shrink-0 transition-colors ${required ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} ${prefs[key as keyof typeof prefs] ? "bg-[#c9a84c]" : "bg-[#2a2a2a]"}`}
               style={{ width: 44, height: 24, borderRadius: 12 }}
             >
               <div
@@ -898,7 +844,7 @@ function NotificationsTab({
         ))}
       </div>
       <button
-        onClick={handleSave}
+        onClick={() => onToast("Notification preferences saved", "success")}
         className="mt-6 w-full bg-[#c9a84c] text-[#0a0a0a] py-3 text-xs font-bold tracking-[4px] uppercase hover:bg-white transition-colors"
       >
         Save Preferences
@@ -907,8 +853,7 @@ function NotificationsTab({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-export default function AccountPage() {
+function AccountContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -923,7 +868,6 @@ export default function AccountPage() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
-
   useEffect(() => {
     if (justOrdered) setActiveTab("orders");
   }, [justOrdered]);
@@ -952,7 +896,6 @@ export default function AccountPage() {
   return (
     <div className="min-h-screen pt-24 px-6 pb-24">
       <div className="max-w-5xl mx-auto py-10">
-        {/* Header */}
         <div className="flex items-start justify-between mb-10">
           <div>
             <p className="text-xs tracking-[5px] text-[#c9a84c] uppercase mb-2">
@@ -966,9 +909,7 @@ export default function AccountPage() {
             </p>
           </div>
         </div>
-
         <div className="grid lg:grid-cols-[220px_1fr] gap-8">
-          {/* Sidebar */}
           <div className="space-y-1">
             {TABS.map((tab) => (
               <button
@@ -989,7 +930,6 @@ export default function AccountPage() {
                 )}
               </button>
             ))}
-
             <div className="pt-4 mt-4 border-t border-[#1e1e1e]">
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
@@ -1002,8 +942,6 @@ export default function AccountPage() {
               </button>
             </div>
           </div>
-
-          {/* Content */}
           <div>
             {activeTab === "orders" && <OrdersTab justOrdered={justOrdered} />}
             {activeTab === "profile" && (
@@ -1016,8 +954,21 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
-
       {toast && <Toast msg={toast.msg} type={toast.type} />}
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen pt-24 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <AccountContent />
+    </Suspense>
   );
 }
