@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { ShopFilters } from "@/components/shop/ShopFilters";
-import { IProduct } from "@/types";
 import { connectDB } from "@/lib/mongoose";
 import { Product } from "@/models/Product";
 
@@ -12,7 +11,10 @@ async function getProducts(category?: string, search?: string) {
     if (category && category !== "all") query.category = category;
     if (search) query.name = { $regex: search, $options: "i" };
     const products = await Product.find(query).limit(24).lean();
-    return { products, total: products.length };
+    return {
+      products: JSON.parse(JSON.stringify(products)),
+      total: products.length,
+    };
   } catch {
     return { products: [], total: 0 };
   }
