@@ -79,6 +79,7 @@ function InputField({
   error,
   rightEl,
   required,
+  disabled,
 }: {
   label: string;
   id?: string;
@@ -90,6 +91,7 @@ function InputField({
   error?: string;
   rightEl?: React.ReactNode;
   required?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div>
@@ -104,7 +106,12 @@ function InputField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full bg-[#0a0a0a] border ${error ? "border-red-500" : "border-[#1e1e1e]"} text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors ${rightEl ? "pr-12" : "pr-4"}`}
+          disabled={disabled}
+          className={`w-full bg-[#0a0a0a] border ${
+            error ? "border-red-500" : "border-[#1e1e1e]"
+          } text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors ${
+            rightEl ? "pr-12" : "pr-4"
+          } disabled:opacity-40 disabled:cursor-not-allowed`}
         />
         {rightEl && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -181,7 +188,11 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`px-4 py-1.5 text-[10px] tracking-[3px] uppercase border transition-colors ${filter === s ? "border-[#c9a84c] text-[#c9a84c]" : "border-[#1e1e1e] text-[#5a5a5a] hover:border-[#3a3a3a]"}`}
+            className={`px-4 py-1.5 text-[10px] tracking-[3px] uppercase border transition-colors ${
+              filter === s
+                ? "border-[#c9a84c] text-[#c9a84c]"
+                : "border-[#1e1e1e] text-[#5a5a5a] hover:border-[#3a3a3a]"
+            }`}
           >
             {s}
             {s !== "all" && orders.filter((o) => o.status === s).length > 0 && (
@@ -232,7 +243,9 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                   </div>
                   <div className="flex items-center gap-3">
                     <span
-                      className={`flex items-center gap-1.5 text-[10px] tracking-widest uppercase px-2.5 py-1 border ${STATUS_COLORS[order.status] || "text-[#5a5a5a]"}`}
+                      className={`flex items-center gap-1.5 text-[10px] tracking-widest uppercase px-2.5 py-1 border ${
+                        STATUS_COLORS[order.status] || "text-[#5a5a5a]"
+                      }`}
                     >
                       {STATUS_ICONS[order.status]}
                       {order.status}
@@ -263,14 +276,20 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                               {i < stepIndex ? "✓" : i + 1}
                             </div>
                             <span
-                              className={`text-[9px] tracking-widest uppercase whitespace-nowrap ${i <= stepIndex ? "text-[#c9a84c]" : "text-[#2a2a2a]"}`}
+                              className={`text-[9px] tracking-widest uppercase whitespace-nowrap ${
+                                i <= stepIndex
+                                  ? "text-[#c9a84c]"
+                                  : "text-[#2a2a2a]"
+                              }`}
                             >
                               {step}
                             </span>
                           </div>
                           {i < STATUS_STEPS.length - 1 && (
                             <div
-                              className={`flex-1 h-px mx-2 mb-5 transition-colors ${i < stepIndex ? "bg-[#c9a84c]" : "bg-[#1e1e1e]"}`}
+                              className={`flex-1 h-px mx-2 mb-5 transition-colors ${
+                                i < stepIndex ? "bg-[#c9a84c]" : "bg-[#1e1e1e]"
+                              }`}
                             />
                           )}
                         </div>
@@ -342,11 +361,25 @@ function ProfileTab({
   user: any;
   onToast: (m: string, t: "success" | "error") => void;
 }) {
-  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(user?.name || "");
-  const [email] = useState(user?.email || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [backupEmail, setBackupEmail] = useState("");
   const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [backupEmailError, setBackupEmailError] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [editingBackup, setEditingBackup] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/user/profile")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.backupEmail) setBackupEmail(d.backupEmail);
+      })
+      .catch(() => {});
+  }, []);
 
   function validateName(v: string) {
     if (!v.trim()) return "Name is required";
@@ -357,7 +390,13 @@ function ProfileTab({
     return "";
   }
 
-  async function handleSave() {
+  function validateEmail(v: string) {
+    if (!v.trim()) return "Email is required";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Invalid email format";
+    return "";
+  }
+
+  async function handleSaveName() {
     const err = validateName(name);
     if (err) {
       setNameError(err);
@@ -371,8 +410,9 @@ function ProfileTab({
         body: JSON.stringify({ name: name.trim() }),
       });
       if (res.ok) {
-        onToast("Profile updated successfully", "success");
-        setEditing(false);
+        onToast("Name updated successfully", "success");
+        setEditingName(false);
+        setNameError("");
       } else {
         const d = await res.json();
         onToast(d.error || "Update failed", "error");
@@ -384,10 +424,68 @@ function ProfileTab({
     }
   }
 
+  async function handleSaveEmail() {
+    const err = validateEmail(email);
+    if (err) {
+      setEmailError(err);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (res.ok) {
+        onToast("Email updated. Signing you out...", "success");
+        setEditingEmail(false);
+        setEmailError("");
+        setTimeout(() => signOut({ callbackUrl: "/login" }), 2000);
+      } else {
+        const d = await res.json();
+        setEmailError(d.error || "Update failed");
+      }
+    } catch {
+      onToast("Something went wrong", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveBackup() {
+    if (backupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupEmail)) {
+      setBackupEmailError("Invalid email format");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backupEmail: backupEmail.trim() }),
+      });
+      if (res.ok) {
+        onToast("Backup email saved", "success");
+        setEditingBackup(false);
+        setBackupEmailError("");
+      } else {
+        const d = await res.json();
+        setBackupEmailError(d.error || "Update failed");
+      }
+    } catch {
+      onToast("Something went wrong", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="border border-[#1e1e1e] p-6">
         <SectionTitle>Personal Information</SectionTitle>
+
+        {/* Avatar */}
         <div className="flex items-center gap-5 mb-8">
           <div className="w-16 h-16 bg-[#c9a84c] flex items-center justify-center text-[#0a0a0a] text-2xl font-black">
             {(user?.name || "U").charAt(0).toUpperCase()}
@@ -400,63 +498,170 @@ function ProfileTab({
             </span>
           </div>
         </div>
-        <div className="space-y-5">
-          <InputField
-            label="Full Name"
-            value={name}
-            required
-            onChange={(v) => {
-              setName(v);
-              if (nameError) setNameError(validateName(v));
-            }}
-            placeholder="Juan Dela Cruz"
-            error={nameError}
-            rightEl={
-              !editing ? (
+
+        <div className="space-y-6">
+          {/* Name */}
+          <div>
+            <InputField
+              label="Full Name"
+              value={name}
+              required
+              onChange={(v) => {
+                setName(v);
+                if (nameError) setNameError(validateName(v));
+              }}
+              placeholder="Juan Dela Cruz"
+              error={nameError}
+              disabled={!editingName}
+              rightEl={
+                !editingName ? (
+                  <button
+                    onClick={() => setEditingName(true)}
+                    className="text-[#5a5a5a] hover:text-[#c9a84c] transition-colors"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                ) : null
+              }
+            />
+            {editingName && (
+              <div className="flex gap-3 mt-3">
                 <button
-                  onClick={() => setEditing(true)}
-                  className="text-[#5a5a5a] hover:text-[#c9a84c] transition-colors"
+                  onClick={() => {
+                    setEditingName(false);
+                    setName(user?.name || "");
+                    setNameError("");
+                  }}
+                  className="flex-1 border border-[#1e1e1e] text-[#5a5a5a] py-2.5 text-xs tracking-[3px] uppercase hover:border-white hover:text-white transition-colors"
                 >
-                  <Edit2 size={14} />
+                  Cancel
                 </button>
-              ) : null
-            }
-          />
-          <InputField
-            label="Email Address"
-            value={email}
-            onChange={() => {}}
-            hint="Email cannot be changed. Contact support if needed."
-          />
-          <div className="border border-[#1e1e1e] p-4 bg-[#0a0a0a]">
-            <p className="text-[10px] tracking-[3px] uppercase text-[#5a5a5a] mb-2">
-              Account Created
-            </p>
-            <p className="text-sm text-white">{formatDate(new Date())}</p>
+                <button
+                  onClick={handleSaveName}
+                  disabled={loading}
+                  className="flex-1 bg-[#c9a84c] text-[#0a0a0a] py-2.5 text-xs font-bold tracking-[3px] uppercase hover:bg-white transition-colors disabled:opacity-50"
+                >
+                  {loading ? "Saving..." : "Save"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Login Email */}
+          <div>
+            <InputField
+              label="Login Email"
+              type="email"
+              value={email}
+              required
+              onChange={(v) => {
+                setEmail(v);
+                if (emailError) setEmailError(validateEmail(v));
+              }}
+              placeholder="you@email.com"
+              error={emailError}
+              disabled={!editingEmail}
+              hint={
+                !editingEmail
+                  ? "Click the edit icon to change your login email."
+                  : undefined
+              }
+              rightEl={
+                !editingEmail ? (
+                  <button
+                    onClick={() => setEditingEmail(true)}
+                    className="text-[#5a5a5a] hover:text-[#c9a84c] transition-colors"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                ) : null
+              }
+            />
+            {editingEmail && (
+              <>
+                <p className="text-yellow-400 text-[11px] mt-2 flex items-center gap-1">
+                  <AlertCircle size={11} />
+                  You will be signed out after changing your email.
+                </p>
+                <div className="flex gap-3 mt-3">
+                  <button
+                    onClick={() => {
+                      setEditingEmail(false);
+                      setEmail(user?.email || "");
+                      setEmailError("");
+                    }}
+                    className="flex-1 border border-[#1e1e1e] text-[#5a5a5a] py-2.5 text-xs tracking-[3px] uppercase hover:border-white hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveEmail}
+                    disabled={loading}
+                    className="flex-1 bg-[#c9a84c] text-[#0a0a0a] py-2.5 text-xs font-bold tracking-[3px] uppercase hover:bg-white transition-colors disabled:opacity-50"
+                  >
+                    {loading ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Backup Email */}
+          <div>
+            <InputField
+              label="Backup Email"
+              type="email"
+              value={backupEmail}
+              onChange={(v) => {
+                setBackupEmail(v);
+                if (backupEmailError) setBackupEmailError("");
+              }}
+              placeholder="backup@email.com"
+              error={backupEmailError}
+              disabled={!editingBackup}
+              hint={
+                !editingBackup
+                  ? backupEmail
+                    ? "Used for account recovery if you forget your login."
+                    : "Optional — add a backup email for account recovery."
+                  : undefined
+              }
+              rightEl={
+                !editingBackup ? (
+                  <button
+                    onClick={() => setEditingBackup(true)}
+                    className="text-[#5a5a5a] hover:text-[#c9a84c] transition-colors"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                ) : null
+              }
+            />
+            {editingBackup && (
+              <div className="flex gap-3 mt-3">
+                <button
+                  onClick={() => {
+                    setEditingBackup(false);
+                    setBackupEmailError("");
+                  }}
+                  className="flex-1 border border-[#1e1e1e] text-[#5a5a5a] py-2.5 text-xs tracking-[3px] uppercase hover:border-white hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveBackup}
+                  disabled={loading}
+                  className="flex-1 bg-[#c9a84c] text-[#0a0a0a] py-2.5 text-xs font-bold tracking-[3px] uppercase hover:bg-white transition-colors disabled:opacity-50"
+                >
+                  {loading ? "Saving..." : "Save"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
-        {editing && (
-          <div className="flex gap-3 mt-6">
-            <button
-              onClick={() => {
-                setEditing(false);
-                setName(user?.name || "");
-                setNameError("");
-              }}
-              className="flex-1 border border-[#1e1e1e] text-[#5a5a5a] py-3 text-xs tracking-[3px] uppercase hover:border-white hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="flex-1 bg-[#c9a84c] text-[#0a0a0a] py-3 text-xs font-bold tracking-[3px] uppercase hover:bg-white transition-colors disabled:opacity-50"
-            >
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Danger zone */}
       <div className="border border-red-900/40 p-6">
         <SectionTitle>Danger Zone</SectionTitle>
         <div className="flex items-center justify-between">
@@ -868,6 +1073,7 @@ function AccountContent() {
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
+
   useEffect(() => {
     if (justOrdered) setActiveTab("orders");
   }, [justOrdered]);

@@ -7,7 +7,7 @@ import { Eye, EyeOff, Mail, CheckCircle2, ArrowLeft, Lock } from "lucide-react";
 
 type Step = "email" | "otp" | "reset" | "done";
 
-function ForgotPasswordContent() {
+function BackupRecoveryContent() {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("email");
@@ -43,11 +43,11 @@ function ForgotPasswordContent() {
       const res = await fetch("/api/auth/forgot-password/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, isBackup: true }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to send OTP");
+        setError(data.error || "No account found with that backup email.");
         setLoading(false);
         return;
       }
@@ -125,7 +125,7 @@ function ForgotPasswordContent() {
     const res = await fetch("/api/auth/forgot-password/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, isBackup: true }),
     });
     if (res.ok) setResendTimer(60);
     else setOtpError("Failed to resend. Try again.");
@@ -195,27 +195,27 @@ function ForgotPasswordContent() {
   return (
     <div className="min-h-screen pt-24 flex items-center justify-center px-6">
       <div className="w-full max-w-md">
-        {/* ── Step 1: Email ── */}
+        {/* ── Step 1: Backup Email ── */}
         {step === "email" && (
           <>
             <Link
-              href="/login"
+              href="/forgot-password"
               className="flex items-center gap-2 text-xs text-[#5a5a5a] hover:text-white transition-colors mb-8 tracking-widest uppercase"
             >
-              <ArrowLeft size={13} /> Back to Login
+              <ArrowLeft size={13} /> Back
             </Link>
             <div className="flex items-center justify-center w-14 h-14 bg-[#c9a84c]/10 border border-[#c9a84c]/20 mb-6">
               <Lock size={22} className="text-[#c9a84c]" />
             </div>
             <p className="text-xs tracking-[5px] text-[#c9a84c] uppercase mb-3">
-              Account Recovery
+              Backup Recovery
             </p>
             <h1 className="text-4xl font-black tracking-tight mb-3">
-              FORGOT PASSWORD
+              USE BACKUP EMAIL
             </h1>
             <p className="text-[#5a5a5a] text-sm mb-8 leading-relaxed">
-              Enter your email and we'll send you a verification code to reset
-              your password.
+              Enter the backup email you previously added to your account. We'll
+              send a verification code to reset your password.
             </p>
             <form onSubmit={handleSendOtp} className="space-y-4">
               {error && (
@@ -225,7 +225,7 @@ function ForgotPasswordContent() {
               )}
               <div>
                 <label className="block text-xs tracking-[3px] uppercase text-[#5a5a5a] mb-2">
-                  Email Address
+                  Backup Email Address
                 </label>
                 <input
                   type="email"
@@ -233,7 +233,7 @@ function ForgotPasswordContent() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#111111] border border-[#1e1e1e] text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors"
-                  placeholder="Enter email address"
+                  placeholder="Enter backup email address"
                 />
               </div>
               <button
@@ -279,7 +279,10 @@ function ForgotPasswordContent() {
             <p className="text-[#5a5a5a] text-sm mb-1">
               We sent a 6-digit code to
             </p>
-            <p className="text-white text-sm font-bold mb-6">{email}</p>
+            <p className="text-white text-sm font-bold mb-1">{email}</p>
+            <span className="inline-block text-[9px] tracking-[2px] uppercase text-[#c9a84c] border border-[#c9a84c]/30 px-2 py-0.5 mb-6">
+              Backup email
+            </span>
 
             <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div>
@@ -332,7 +335,6 @@ function ForgotPasswordContent() {
               </button>
             </form>
 
-            {/* Resend */}
             <div className="mt-6 text-center">
               <p className="text-xs text-[#5a5a5a] mb-2">
                 Didn't receive the code?
@@ -352,19 +354,6 @@ function ForgotPasswordContent() {
                   Resend Code
                 </button>
               )}
-            </div>
-
-            {/* ── Backup email option — navigates to separate page ── */}
-            <div className="mt-8 border-t border-[#1e1e1e] pt-6 text-center">
-              <p className="text-xs text-[#5a5a5a] mb-3">
-                No longer have access to this email?
-              </p>
-              <Link
-                href="/forgot-password/backup"
-                className="text-xs tracking-[2px] uppercase text-[#5a5a5a] border border-[#1e1e1e] px-5 py-2.5 hover:border-[#c9a84c]/40 hover:text-[#c9a84c] transition-colors inline-block"
-              >
-                Try backup email instead
-              </Link>
             </div>
           </>
         )}
@@ -511,7 +500,7 @@ function ForgotPasswordContent() {
   );
 }
 
-export default function ForgotPasswordPage() {
+export default function BackupRecoveryPage() {
   return (
     <Suspense
       fallback={
@@ -520,7 +509,7 @@ export default function ForgotPasswordPage() {
         </div>
       }
     >
-      <ForgotPasswordContent />
+      <BackupRecoveryContent />
     </Suspense>
   );
 }
