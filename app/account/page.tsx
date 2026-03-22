@@ -137,6 +137,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [cancelling, setCancelling] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/orders")
@@ -147,6 +148,29 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  async function handleCancel(orderId: string) {
+    if (!confirm("Are you sure you want to cancel this order?")) return;
+    setCancelling(orderId);
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) =>
+            o._id === orderId ? { ...o, status: "cancelled" } : o,
+          ),
+        );
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setCancelling(null);
+    }
+  }
 
   const filtered =
     filter === "all" ? orders : orders.filter((o) => o.status === filter);
@@ -227,6 +251,8 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           {filtered.map((order) => {
             const stepIndex = STATUS_STEPS.indexOf(order.status);
             const isCancelled = order.status === "cancelled";
+            const isPending = order.status === "pending";
+
             return (
               <div
                 key={order._id}
@@ -255,6 +281,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </span>
                   </div>
                 </div>
+
                 {!isCancelled && (
                   <div className="px-5 py-4 border-b border-[#1e1e1e]">
                     <div className="flex items-center">
@@ -297,6 +324,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </div>
                   </div>
                 )}
+
                 {isCancelled && (
                   <div className="px-5 py-3 border-b border-[#1e1e1e] bg-red-900/5 flex items-center gap-2">
                     <XCircle size={13} className="text-red-400" />
@@ -305,6 +333,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </p>
                   </div>
                 )}
+
                 <div className="p-5 space-y-3">
                   {order.items?.map((item: any, i: number) => (
                     <div key={i} className="flex gap-3 items-center">
@@ -331,19 +360,43 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </div>
                   ))}
                 </div>
+
                 <div className="px-5 py-3 border-t border-[#1e1e1e] bg-[#111111] flex flex-wrap justify-between gap-2 text-[10px] text-[#5a5a5a]">
-                  <span>
-                    Payment:{" "}
-                    <span className="text-white uppercase tracking-widest">
-                      {order.paymentMethod === "online" ? "GCash" : "COD"}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 items-center">
+                    <span>
+                      Payment:{" "}
+                      <span className="text-white uppercase tracking-widest">
+                        {order.paymentMethod === "online" ? "GCash" : "COD"}
+                      </span>
                     </span>
-                  </span>
-                  <span>
-                    Ship to: <span className="text-white">{order.address}</span>
-                  </span>
-                  <span>
-                    Phone: <span className="text-white">{order.phone}</span>
-                  </span>
+                    <span>
+                      Ship to:{" "}
+                      <span className="text-white">{order.address}</span>
+                    </span>
+                    <span>
+                      Phone: <span className="text-white">{order.phone}</span>
+                    </span>
+                  </div>
+
+                  {isPending && (
+                    <button
+                      onClick={() => handleCancel(order._id)}
+                      disabled={cancelling === order._id}
+                      className="text-[10px] tracking-[2px] uppercase border border-red-900/40 text-red-400 px-3 py-1 hover:bg-red-900/20 transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+                    >
+                      {cancelling === order._id ? (
+                        <>
+                          <span className="w-2.5 h-2.5 border border-red-400 border-t-transparent rounded-full animate-spin" />
+                          Cancelling...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={11} />
+                          Cancel Order
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -484,8 +537,6 @@ function ProfileTab({
     <div className="space-y-6">
       <div className="border border-[#1e1e1e] p-6">
         <SectionTitle>Personal Information</SectionTitle>
-
-        {/* Avatar */}
         <div className="flex items-center gap-5 mb-8">
           <div className="w-16 h-16 bg-[#c9a84c] flex items-center justify-center text-[#0a0a0a] text-2xl font-black">
             {(user?.name || "U").charAt(0).toUpperCase()}
@@ -498,9 +549,7 @@ function ProfileTab({
             </span>
           </div>
         </div>
-
         <div className="space-y-6">
-          {/* Name */}
           <div>
             <InputField
               label="Full Name"
@@ -547,7 +596,6 @@ function ProfileTab({
             )}
           </div>
 
-          {/* Login Email */}
           <div>
             <InputField
               label="Login Email"
@@ -606,7 +654,6 @@ function ProfileTab({
             )}
           </div>
 
-          {/* Backup Email */}
           <div>
             <InputField
               label="Backup Email"
@@ -661,7 +708,6 @@ function ProfileTab({
         </div>
       </div>
 
-      {/* Danger zone */}
       <div className="border border-red-900/40 p-6">
         <SectionTitle>Danger Zone</SectionTitle>
         <div className="flex items-center justify-between">
