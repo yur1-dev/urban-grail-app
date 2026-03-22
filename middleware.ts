@@ -11,6 +11,14 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/account");
 
+  // If already logged in and hits /login → redirect away immediately
+  if (pathname === "/login" && token) {
+    if ((token as any)?.role === "admin") {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
   if (isProtected && !token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
@@ -23,5 +31,10 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/checkout/:path*", "/account/:path*"],
+  matcher: [
+    "/login",
+    "/dashboard/:path*",
+    "/checkout/:path*",
+    "/account/:path*",
+  ],
 };
