@@ -9,7 +9,7 @@ import { Eye, EyeOff } from "lucide-react";
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || null;
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -29,14 +29,16 @@ function LoginContent() {
       return;
     }
 
+    router.refresh();
+    await new Promise((r) => setTimeout(r, 300));
+
     const sessionRes = await fetch("/api/auth/session");
     const session = await sessionRes.json();
     const role = session?.user?.role;
 
-    if (callbackUrl) router.push(callbackUrl);
+    if (callbackUrl !== "/") router.push(callbackUrl);
     else if (role === "admin") router.push("/dashboard");
     else router.push("/");
-    router.refresh();
   }
 
   return (
@@ -46,9 +48,7 @@ function LoginContent() {
           Welcome Back
         </p>
         <h1 className="text-5xl font-black tracking-tight mb-2">LOGIN</h1>
-        <p className="text-[#5a5a5a] text-sm mb-10">
-          Admin goes straight to dashboard. Customers go to homepage.
-        </p>
+        <p className="text-[#5a5a5a] text-sm mb-10">Sign in to your account.</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
