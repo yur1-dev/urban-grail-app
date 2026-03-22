@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getToken } from "next-auth/jwt";
 
 export async function middleware(req: NextRequest) {
-  const session = await auth();
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName:
+      process.env.NODE_ENV === "production"
+        ? "__Secure-authjs.session-token"
+        : "authjs.session-token",
+  });
+
   const { pathname } = req.nextUrl;
 
   const isAdminRoute = pathname.startsWith("/dashboard");
@@ -11,18 +19,18 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/account");
 
-  if (pathname === "/login" && session) {
-    if ((session.user as any)?.role === "admin") {
+  if (pathname === "/login" && token) {
+    if ((token as any)?.role === "admin") {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  if (isProtected && !session) {
+  if (isProtected && !token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (isAdminRoute && (session?.user as any)?.role !== "admin") {
+  if (isAdminRoute && (token as any)?.role !== "admin") {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
