@@ -210,7 +210,7 @@ export function Footer() {
         </div>
 
         {/* ── Newsletter strip ── */}
-        <div className="mt-14 border border-[#1e1e1e] p-6 bg-[#111111] flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        {/* <div className="mt-14 border border-[#1e1e1e] p-6 bg-[#111111] flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
             <p className="text-sm font-black tracking-widest uppercase mb-1">
               Get Early Access to Drops
@@ -229,7 +229,7 @@ export function Footer() {
               Notify Me
             </button>
           </div>
-        </div>
+        </div> */}
 
         {/* ── Bottom bar ── */}
         <div className="mt-10 pt-6 border-t border-[#1e1e1e] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
