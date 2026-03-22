@@ -29,16 +29,12 @@ function LoginContent() {
       return;
     }
 
+    if (callbackUrl !== "/") {
+      router.push(callbackUrl);
+    } else {
+      router.push("/dashboard");
+    }
     router.refresh();
-    await new Promise((r) => setTimeout(r, 300));
-
-    const sessionRes = await fetch("/api/auth/session");
-    const session = await sessionRes.json();
-    const role = session?.user?.role;
-
-    if (callbackUrl !== "/") router.push(callbackUrl);
-    else if (role === "admin") router.push("/dashboard");
-    else router.push("/");
   }
 
   return (
