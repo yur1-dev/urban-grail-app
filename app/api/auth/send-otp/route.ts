@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { connectDB } from "@/lib/mongoose";
 import { User, IUser } from "@/models/User";
-import { otpStore } from "@/lib/otpStore";
+import { OtpVerification } from "@/models/OtpVerification";
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -13,8 +13,14 @@ export async function POST(req: NextRequest) {
     const { email, name } = await req.json();
     if (!email)
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    if (!name || name.trim().length < 2)
+      return NextResponse.json(
+        { error: "Name must be at least 2 characters" },
+        { status: 400 },
+      );
 
     await connectDB();
+
     const existing = await User.findOne<IUser>({ email: email.toLowerCase() });
     if (existing) {
       return NextResponse.json(
@@ -24,8 +30,13 @@ export async function POST(req: NextRequest) {
     }
 
     const otp = generateOTP();
-    const expires = Date.now() + 10 * 60 * 1000;
-    otpStore.set(email.toLowerCase(), { otp, expires, name });
+    const expires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await OtpVerification.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { email: email.toLowerCase(), otp, name: name.trim(), expires },
+      { upsert: true, new: true },
+    );
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       console.log(`\n🔑 OTP for ${email}: ${otp}\n`);
@@ -52,7 +63,7 @@ export async function POST(req: NextRequest) {
           <p style="color:#3a3a3a;font-size:10px;letter-spacing:4px;text-transform:uppercase;margin:0 0 40px">
             Est. Manila · Streetwear Culture
           </p>
-          <p style="color:#ffffff;font-size:14px;margin:0 0 8px">Hey ${name || "there"},</p>
+          <p style="color:#ffffff;font-size:14px;margin:0 0 8px">Hey ${name.trim()},</p>
           <p style="color:#5a5a5a;font-size:13px;line-height:1.8;margin:0 0 32px">
             Enter this code to verify your email and create your account.<br/>
             Code expires in <strong style="color:#ffffff">10 minutes</strong>.
