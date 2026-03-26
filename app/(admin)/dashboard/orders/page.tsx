@@ -11,6 +11,7 @@ import {
   XCircle,
   Clock,
   Settings2,
+  X,
 } from "lucide-react";
 
 const STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
@@ -80,20 +81,25 @@ export default function AdminOrdersPage() {
 
   async function updateStatus(id: string, status: string) {
     setUpdating(id);
-    const res = await fetch(`/api/orders/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    if (res.ok) {
-      setOrders((prev) =>
-        prev.map((o) => (o._id === id ? { ...o, status } : o)),
-      );
-      showToast(`Order updated to ${status}`, "success");
-    } else {
-      showToast("Failed to update order", "error");
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        setOrders((prev) =>
+          prev.map((o) => (o._id === id ? { ...o, status } : o)),
+        );
+        showToast(`Order updated to ${status}`, "success");
+      } else {
+        showToast("Failed to update order", "error");
+      }
+    } catch {
+      showToast("Something went wrong", "error");
+    } finally {
+      setUpdating(null);
     }
-    setUpdating(null);
   }
 
   const filtered = orders.filter((o) => {
@@ -106,7 +112,7 @@ export default function AdminOrdersPage() {
     return matchFilter && matchSearch;
   });
 
-  const totalRevenue = filtered
+  const totalRevenue = orders
     .filter((o) => o.status !== "cancelled")
     .reduce((s, o) => s + o.total, 0);
 
@@ -128,13 +134,8 @@ export default function AdminOrdersPage() {
             </p>
             <h1 className="text-5xl font-black tracking-tight">ORDERS</h1>
             <p className="text-[#5a5a5a] text-xs mt-2">
-              {orders.length} total orders ·{" "}
-              {formatPrice(
-                orders
-                  .filter((o) => o.status !== "cancelled")
-                  .reduce((s, o) => s + o.total, 0),
-              )}{" "}
-              total revenue
+              {orders.length} total orders · {formatPrice(totalRevenue)} total
+              revenue
             </p>
           </div>
         </div>
@@ -148,7 +149,7 @@ export default function AdminOrdersPage() {
               <button
                 key={s}
                 onClick={() => setFilter(filter === s ? "all" : s)}
-                className={`border p-4 text-left transition-all ${
+                className={`border p-4 text-left transition-all cursor-pointer ${
                   filter === s
                     ? `${cfg.border} ${cfg.bg}`
                     : "border-[#1e1e1e] hover:border-[#2a2a2a]"
@@ -170,7 +171,7 @@ export default function AdminOrdersPage() {
           })}
         </div>
 
-        {/* Search + filter */}
+        {/* Search + filter bar */}
         <div className="flex flex-col md:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search
@@ -181,8 +182,16 @@ export default function AdminOrdersPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by order ID, customer name or email..."
-              className="w-full bg-[#111111] border border-[#1e1e1e] text-white pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors"
+              className="w-full bg-[#111111] border border-[#1e1e1e] text-white pl-10 pr-10 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a5a5a] hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-[#5a5a5a] border border-[#1e1e1e] px-4 py-3">
             <Filter size={13} />
@@ -190,12 +199,19 @@ export default function AdminOrdersPage() {
               {filter === "all" ? "All Orders" : filter} · {filtered.length}{" "}
               results
             </span>
+            {filter !== "all" && (
+              <button
+                onClick={() => setFilter("all")}
+                className="ml-2 text-[#c9a84c] hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Table */}
         <div className="border border-[#1e1e1e] overflow-hidden">
-          {/* Table header */}
           <div className="hidden md:grid grid-cols-[120px_1fr_120px_100px_160px_100px_80px] gap-4 px-5 py-3 border-b border-[#1e1e1e] bg-[#111111]">
             {[
               "Order ID",
@@ -225,6 +241,17 @@ export default function AdminOrdersPage() {
               <p className="text-[#3a3a3a] text-xs tracking-widest uppercase">
                 No orders found
               </p>
+              {(search || filter !== "all") && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setFilter("all");
+                  }}
+                  className="mt-4 text-[10px] tracking-[2px] uppercase text-[#c9a84c] hover:text-white transition-colors cursor-pointer"
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-[#1e1e1e]">
@@ -241,12 +268,9 @@ export default function AdminOrdersPage() {
                       className="grid grid-cols-1 md:grid-cols-[120px_1fr_120px_100px_160px_100px_80px] gap-4 px-5 py-4 hover:bg-[#111111] transition-colors items-center cursor-pointer"
                       onClick={() => setExpanded(isExpanded ? null : order._id)}
                     >
-                      {/* Order ID */}
                       <p className="font-mono text-[11px] text-[#5a5a5a]">
                         #{order._id.slice(-8).toUpperCase()}
                       </p>
-
-                      {/* Customer */}
                       <div>
                         <p className="text-sm font-medium">
                           {order.user?.name || "N/A"}
@@ -255,13 +279,9 @@ export default function AdminOrdersPage() {
                           {order.user?.email || ""}
                         </p>
                       </div>
-
-                      {/* Total */}
                       <p className="text-[#c9a84c] font-black text-sm">
                         {formatPrice(order.total)}
                       </p>
-
-                      {/* Payment */}
                       <span className="text-[11px] text-[#5a5a5a] uppercase tracking-wider">
                         {order.paymentMethod === "online" ||
                         order.paymentMethod === "gcash"
@@ -302,7 +322,6 @@ export default function AdminOrdersPage() {
                         </div>
                       </div>
 
-                      {/* Date */}
                       <p className="text-[11px] text-[#5a5a5a]">
                         {new Date(order.createdAt).toLocaleDateString("en-PH", {
                           month: "short",
@@ -310,8 +329,6 @@ export default function AdminOrdersPage() {
                           year: "numeric",
                         })}
                       </p>
-
-                      {/* Expand */}
                       <div className="flex justify-end">
                         <ChevronDown
                           size={14}
@@ -373,7 +390,9 @@ export default function AdminOrdersPage() {
                                     Recipient
                                   </span>
                                   <span className="text-white font-medium">
-                                    {order.user?.name || "N/A"}
+                                    {order.recipientName ||
+                                      order.user?.name ||
+                                      "N/A"}
                                   </span>
                                 </div>
                                 <div className="flex justify-between text-xs">

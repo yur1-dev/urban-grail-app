@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "@/components/admin/ImageUploader";
 import { AlertCircle, ArrowLeft } from "lucide-react";
@@ -83,7 +83,7 @@ export default function NewProductPage() {
     featured: false,
   });
 
-  function validate() {
+  const validate = useCallback(() => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Product name is required";
     if (!form.description.trim()) e.description = "Description is required";
@@ -95,7 +95,14 @@ export default function NewProductPage() {
     if (form.images.length === 0) e.images = "At least one image is required";
     if (form.sizes.length === 0) e.sizes = "Select at least one size";
     return e;
-  }
+  }, [form]);
+
+  // Only re-validate after first submit attempt
+  useEffect(() => {
+    if (submitted) {
+      setErrors(validate());
+    }
+  }, [form, submitted, validate]);
 
   function toggleSize(size: string) {
     setForm((f) => ({
@@ -112,34 +119,40 @@ export default function NewProductPage() {
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
+      // Scroll to first error
+      const firstKey = Object.keys(errs)[0];
+      document
+        .getElementById(firstKey)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
     setLoading(true);
-    const res = await fetch("/api/products", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock),
-      }),
-    });
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          price: parseFloat(form.price),
+          stock: parseInt(form.stock),
+        }),
+      });
 
-    if (res.ok) {
-      router.push("/dashboard/products");
-    } else {
-      const d = await res.json();
-      setErrors({ global: d.error || "Failed to save product" });
+      if (res.ok) {
+        router.push("/dashboard/products");
+      } else {
+        const d = await res.json();
+        setErrors({ global: d.error || "Failed to save product" });
+      }
+    } catch {
+      setErrors({ global: "Something went wrong. Please try again." });
+    } finally {
       setLoading(false);
     }
   }
 
-  // Live validation after first submit attempt
-  if (submitted) {
-    const fresh = validate();
-    if (JSON.stringify(fresh) !== JSON.stringify(errors)) setErrors(fresh);
-  }
+  const errorCount = Object.keys(errors).filter((k) => k !== "global").length;
 
   return (
     <div className="min-h-screen pt-24 px-6 pb-24">
@@ -147,7 +160,7 @@ export default function NewProductPage() {
         {/* Header */}
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-xs text-[#5a5a5a] hover:text-white transition-colors mb-8 tracking-widest uppercase"
+          className="flex items-center gap-2 text-xs text-[#5a5a5a] hover:text-white transition-colors mb-8 tracking-widest uppercase cursor-pointer"
         >
           <ArrowLeft size={13} /> Back
         </button>
@@ -167,7 +180,7 @@ export default function NewProductPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-          {/* ── Section 1: Images ── */}
+          {/* Section 1: Images */}
           <div className="border border-[#1e1e1e] p-6 space-y-1">
             <div className="flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -183,14 +196,16 @@ export default function NewProductPage() {
               required
               hint="First image will be the main display image. Max 5MB each."
             >
-              <ImageUploader
-                images={form.images}
-                onChange={(imgs) => setForm({ ...form, images: imgs })}
-              />
+              <div id="images">
+                <ImageUploader
+                  images={form.images}
+                  onChange={(imgs) => setForm({ ...form, images: imgs })}
+                />
+              </div>
             </Field>
           </div>
 
-          {/* ── Section 2: Basic Info ── */}
+          {/* Section 2: Basic Info */}
           <div className="border border-[#1e1e1e] p-6 space-y-5">
             <div className="flex items-center gap-3 mb-2">
               <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -203,6 +218,7 @@ export default function NewProductPage() {
 
             <Field label="Product Name" error={errors.name} required>
               <input
+                id="name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -213,6 +229,7 @@ export default function NewProductPage() {
 
             <Field label="Description" error={errors.description} required>
               <textarea
+                id="description"
                 rows={4}
                 value={form.description}
                 onChange={(e) =>
@@ -230,7 +247,7 @@ export default function NewProductPage() {
               <select
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className={INPUT}
+                className={`${INPUT} cursor-pointer`}
               >
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c} className="bg-[#111111] capitalize">
@@ -241,7 +258,7 @@ export default function NewProductPage() {
             </Field>
           </div>
 
-          {/* ── Section 3: Pricing & Stock ── */}
+          {/* Section 3: Pricing & Stock */}
           <div className="border border-[#1e1e1e] p-6 space-y-5">
             <div className="flex items-center gap-3 mb-2">
               <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -259,6 +276,7 @@ export default function NewProductPage() {
                     ₱
                   </span>
                   <input
+                    id="price"
                     type="number"
                     min="0"
                     step="0.01"
@@ -274,6 +292,7 @@ export default function NewProductPage() {
 
               <Field label="Stock Quantity" error={errors.stock} required>
                 <input
+                  id="stock"
                   type="number"
                   min="0"
                   value={form.stock}
@@ -284,7 +303,6 @@ export default function NewProductPage() {
               </Field>
             </div>
 
-            {/* Stock indicator */}
             {form.stock && (
               <div
                 className={`text-[11px] px-3 py-2 border ${
@@ -304,7 +322,7 @@ export default function NewProductPage() {
             )}
           </div>
 
-          {/* ── Section 4: Sizes ── */}
+          {/* Section 4: Sizes */}
           <div className="border border-[#1e1e1e] p-6 space-y-5">
             <div className="flex items-center gap-3 mb-2">
               <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -315,14 +333,14 @@ export default function NewProductPage() {
               </h2>
             </div>
 
-            <div>
+            <div id="sizes">
               <div className="flex flex-wrap gap-2">
                 {SIZES.map((size) => (
                   <button
                     key={size}
                     type="button"
                     onClick={() => toggleSize(size)}
-                    className={`px-4 py-2 text-sm border tracking-widest transition-colors ${
+                    className={`px-4 py-2 text-sm border tracking-widest transition-colors cursor-pointer ${
                       form.sizes.includes(size)
                         ? "border-[#c9a84c] text-[#c9a84c] bg-[#c9a84c]/5"
                         : "border-[#1e1e1e] text-[#5a5a5a] hover:border-white hover:text-white"
@@ -349,7 +367,7 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          {/* ── Section 5: Settings ── */}
+          {/* Section 5: Settings */}
           <div className="border border-[#1e1e1e] p-6">
             <div className="flex items-center gap-3 mb-5">
               <span className="w-6 h-6 rounded-full bg-[#c9a84c] text-[#0a0a0a] text-xs font-black flex items-center justify-center">
@@ -384,38 +402,32 @@ export default function NewProductPage() {
           </div>
 
           {/* Validation summary */}
-          {submitted &&
-            Object.keys(errors).filter((k) => k !== "global").length > 0 && (
-              <div className="border border-red-800 bg-red-900/10 p-4 flex items-start gap-3">
-                <AlertCircle
-                  size={14}
-                  className="text-red-400 flex-shrink-0 mt-0.5"
-                />
-                <p className="text-red-400 text-xs">
-                  Please fix{" "}
-                  {Object.keys(errors).filter((k) => k !== "global").length}{" "}
-                  error
-                  {Object.keys(errors).filter((k) => k !== "global").length > 1
-                    ? "s"
-                    : ""}{" "}
-                  above before saving.
-                </p>
-              </div>
-            )}
+          {submitted && errorCount > 0 && (
+            <div className="border border-red-800 bg-red-900/10 p-4 flex items-start gap-3">
+              <AlertCircle
+                size={14}
+                className="text-red-400 flex-shrink-0 mt-0.5"
+              />
+              <p className="text-red-400 text-xs">
+                Please fix {errorCount} error{errorCount > 1 ? "s" : ""} above
+                before saving.
+              </p>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-4">
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 border border-[#1e1e1e] text-[#5a5a5a] py-4 text-xs font-bold tracking-[4px] uppercase hover:border-white hover:text-white transition-colors"
+              className="flex-1 border border-[#1e1e1e] text-[#5a5a5a] py-4 text-xs font-bold tracking-[4px] uppercase hover:border-white hover:text-white transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-[#c9a84c] text-[#0a0a0a] py-4 text-xs font-bold tracking-[4px] uppercase hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 bg-[#c9a84c] text-[#0a0a0a] py-4 text-xs font-bold tracking-[4px] uppercase hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? (
                 <>
