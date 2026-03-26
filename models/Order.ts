@@ -40,6 +40,9 @@ const OrderSchema = new Schema(
     address: { type: String, required: true },
     phone: { type: String, required: true },
     notes: { type: String },
+    assignedRider: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    deliveryProof: { type: String, default: null },
+    deliveredAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

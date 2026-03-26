@@ -45,6 +45,9 @@ export interface IOrder {
   address: string;
   phone: string;
   notes?: string;
+  assignedRider?: IUser | string | null;
+  deliveryProof?: string | null;
+  deliveredAt?: Date | string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,7 +56,7 @@ export interface IUser {
   _id: string;
   name: string;
   email: string;
-  role: "customer" | "admin";
+  role: "customer" | "admin" | "rider";
   createdAt: Date;
 }
 

@@ -12,17 +12,21 @@ export async function middleware(req: NextRequest) {
   });
 
   const { pathname } = req.nextUrl;
+  const role = (token as any)?.role;
 
   const isAdminRoute = pathname.startsWith("/dashboard");
+  const isRiderRoute = pathname.startsWith("/rider");
   const isProtected =
     isAdminRoute ||
+    isRiderRoute ||
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/account");
 
   if (pathname === "/login" && token) {
-    if ((token as any)?.role === "admin") {
+    if (role === "admin")
       return NextResponse.redirect(new URL("/dashboard", req.url));
-    }
+    if (role === "rider")
+      return NextResponse.redirect(new URL("/rider", req.url));
     return NextResponse.redirect(new URL("/", req.url));
   }
 
@@ -30,7 +34,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (isAdminRoute && (token as any)?.role !== "admin") {
+  if (isAdminRoute && role !== "admin") {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
+  if (isRiderRoute && role !== "rider" && role !== "admin") {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
@@ -41,6 +49,8 @@ export const config = {
   matcher: [
     "/login",
     "/dashboard/:path*",
+    "/rider/:path*",
+    "/rider",
     "/checkout/:path*",
     "/account",
     "/account/:path*",
