@@ -18,9 +18,10 @@ module.exports = function (api) {
             '@navigation': './src/navigation',
             '@api': './src/api',
           },
+          extensions: ['.ios.js', '.android.js', '.js', '.jsx', '.ts', '.tsx', '.json'],
         },
       ],
-      'react-native-dotenv',
+      ['react-native-dotenv'],
     ],
   };
 };
