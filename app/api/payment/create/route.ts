@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { verify } from "jsonwebtoken";
+
+function getUserFromBearer(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  try {
+    const token = authHeader.slice(7);
+    const decoded = verify(token, process.env.NEXTAUTH_SECRET!) as any;
+    return { id: decoded.id, email: decoded.email };
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let user = getUserFromBearer(req);
+    if (!user) {
+      const session = await auth();
+      if (!session)
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      user = session.user as any;
+    }
 
     const { amount, orderId, customerName, customerEmail } = await req.json();
 
