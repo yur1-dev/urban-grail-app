@@ -533,6 +533,25 @@ function ProfileTab({
     }
   }
 
+  async function handleDeleteAccount() {
+    if (
+      !confirm(
+        "Permanently delete your account and all order history? This cannot be undone.",
+      )
+    )
+      return;
+    try {
+      const res = await fetch("/api/user/delete", { method: "DELETE" });
+      if (res.ok) {
+        await signOut({ callbackUrl: "/" });
+      } else {
+        onToast("Failed to delete account", "error");
+      }
+    } catch {
+      onToast("Something went wrong", "error");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="border border-[#1e1e1e] p-6">
@@ -708,6 +727,7 @@ function ProfileTab({
         </div>
       </div>
 
+      {/* ── Danger Zone ── */}
       <div className="border border-red-900/40 p-6">
         <SectionTitle>Danger Zone</SectionTitle>
         <div className="flex items-center justify-between">
@@ -719,9 +739,7 @@ function ProfileTab({
             </p>
           </div>
           <button
-            onClick={() =>
-              onToast("Please contact support to delete your account.", "error")
-            }
+            onClick={handleDeleteAccount}
             className="text-xs tracking-[2px] uppercase border border-red-900/40 text-red-400 px-4 py-2 hover:bg-red-900/20 transition-colors flex-shrink-0 ml-4"
           >
             Delete
