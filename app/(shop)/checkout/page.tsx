@@ -123,32 +123,38 @@ function CheckoutContent() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const validate = useCallback(() => {
-    const e: Record<string, string> = {};
-    const nameErr = validateName(form.recipientName);
-    if (nameErr) e.recipientName = nameErr;
-    if (!form.address.trim()) e.address = "Street address is required";
-    else if (form.address.trim().length < 5)
-      e.address = "Please enter your street/house number";
-    if (!form.barangay.trim()) e.barangay = "Barangay is required";
-    if (!form.city.trim()) e.city = "City/Municipality is required";
-    if (!form.province.trim()) e.province = "Province is required";
-    if (!form.zipCode.trim()) e.zipCode = "ZIP code is required";
-    else if (!/^\d{4}$/.test(form.zipCode.trim()))
-      e.zipCode = "ZIP code must be 4 digits";
-    const phoneErr = validatePhone(form.phone);
-    if (phoneErr) e.phone = phoneErr;
-    if (form.altPhone.trim()) {
-      const altErr = validatePhone(form.altPhone);
-      if (altErr) e.altPhone = altErr;
-    }
-    if (!form.agreeToTerms)
-      e.agreeToTerms = "You must agree to the terms to place your order";
-    return e;
-  }, [form, paymentMethod]);
+  const validate = useCallback(
+    (currentForm = form) => {
+      const e: Record<string, string> = {};
+      const nameErr = validateName(currentForm.recipientName);
+      if (nameErr) e.recipientName = nameErr;
+      if (!currentForm.address.trim()) e.address = "Street address is required";
+      else if (currentForm.address.trim().length < 5)
+        e.address = "Please enter your street/house number";
+      if (!currentForm.barangay.trim()) e.barangay = "Barangay is required";
+      if (!currentForm.city.trim()) e.city = "City/Municipality is required";
+      if (!currentForm.province.trim()) e.province = "Province is required";
+      if (!currentForm.zipCode.trim()) e.zipCode = "ZIP code is required";
+      else if (!/^\d{4}$/.test(currentForm.zipCode.trim()))
+        e.zipCode = "ZIP code must be 4 digits";
+      const phoneErr = validatePhone(currentForm.phone);
+      if (phoneErr) e.phone = phoneErr;
+      if (currentForm.altPhone.trim()) {
+        const altErr = validatePhone(currentForm.altPhone);
+        if (altErr) e.altPhone = altErr;
+      }
+      if (!currentForm.agreeToTerms)
+        e.agreeToTerms = "You must agree to the terms to place your order";
+      return e;
+    },
+    [form],
+  );
 
+  // Only re-validate after the user has attempted to submit
   useEffect(() => {
-    if (submitAttempted) setErrors(validate());
+    if (submitAttempted) {
+      setErrors(validate(form));
+    }
   }, [form, submitAttempted, validate]);
 
   useEffect(() => {
@@ -191,7 +197,7 @@ function CheckoutContent() {
   async function handleOrder(e: React.FormEvent) {
     e.preventDefault();
     setSubmitAttempted(true);
-    const errs = validate();
+    const errs = validate(form);
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       const firstKey = Object.keys(errs)[0];
@@ -250,11 +256,6 @@ function CheckoutContent() {
           return;
         }
         const payData = await payRes.json();
-        await fetch(`/api/orders/${order._id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ xenditInvoiceUrl: payData.invoiceUrl }),
-        });
         clearCart();
         window.location.href = payData.invoiceUrl;
         return;
@@ -269,6 +270,9 @@ function CheckoutContent() {
 
   const inputClass = (field: string) =>
     `w-full bg-[#111111] border ${errors[field] ? "border-red-500" : "border-[#1e1e1e]"} text-white px-4 py-3 text-sm focus:outline-none focus:border-[#c9a84c] transition-colors`;
+
+  // Count only real validation errors, not global
+  const errorCount = Object.keys(errors).filter((k) => k !== "global").length;
 
   return (
     <div className="min-h-screen pt-24 px-6 pb-24">
@@ -314,7 +318,6 @@ function CheckoutContent() {
                   onChange={(e) =>
                     setForm({ ...form, recipientName: e.target.value })
                   }
-                  onBlur={() => submitAttempted && setErrors(validate())}
                   className={inputClass("recipientName")}
                   placeholder="Juan Dela Cruz"
                   autoComplete="name"
@@ -329,7 +332,6 @@ function CheckoutContent() {
                     onChange={(e) =>
                       setForm({ ...form, phone: e.target.value })
                     }
-                    onBlur={() => submitAttempted && setErrors(validate())}
                     className={inputClass("phone")}
                     placeholder="09XXXXXXXXX"
                     maxLength={11}
@@ -370,7 +372,6 @@ function CheckoutContent() {
                   onChange={(e) =>
                     setForm({ ...form, address: e.target.value })
                   }
-                  onBlur={() => submitAttempted && setErrors(validate())}
                   className={inputClass("address")}
                   placeholder="123 Rizal Street"
                   autoComplete="address-line1"
@@ -384,7 +385,6 @@ function CheckoutContent() {
                   onChange={(e) =>
                     setForm({ ...form, barangay: e.target.value })
                   }
-                  onBlur={() => submitAttempted && setErrors(validate())}
                   className={inputClass("barangay")}
                   placeholder="Barangay San Antonio"
                 />
@@ -396,7 +396,6 @@ function CheckoutContent() {
                     type="text"
                     value={form.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    onBlur={() => submitAttempted && setErrors(validate())}
                     className={inputClass("city")}
                     placeholder="Las Piñas"
                     autoComplete="address-level2"
@@ -414,7 +413,6 @@ function CheckoutContent() {
                     onChange={(e) =>
                       setForm({ ...form, province: e.target.value })
                     }
-                    onBlur={() => submitAttempted && setErrors(validate())}
                     className={inputClass("province")}
                     placeholder="Metro Manila"
                     autoComplete="address-level1"
@@ -432,7 +430,6 @@ function CheckoutContent() {
                       zipCode: e.target.value.replace(/\D/g, "").slice(0, 4),
                     })
                   }
-                  onBlur={() => submitAttempted && setErrors(validate())}
                   className={`${inputClass("zipCode")} w-32`}
                   placeholder="1740"
                   maxLength={4}
@@ -562,13 +559,16 @@ function CheckoutContent() {
             </div>
 
             {/* Terms */}
-            <div className="space-y-3">
+            <div id="agreeToTerms" className="space-y-3">
               <label
                 className={`flex items-start gap-3 cursor-pointer group ${errors.agreeToTerms ? "text-red-400" : "text-[#5a5a5a]"}`}
               >
                 <div
                   onClick={() =>
-                    setForm({ ...form, agreeToTerms: !form.agreeToTerms })
+                    setForm((prev) => ({
+                      ...prev,
+                      agreeToTerms: !prev.agreeToTerms,
+                    }))
                   }
                   className={`w-5 h-5 border flex-shrink-0 flex items-center justify-center mt-0.5 transition-colors cursor-pointer ${
                     form.agreeToTerms
@@ -609,16 +609,15 @@ function CheckoutContent() {
 
             {/* Submit */}
             <div className="space-y-3">
-              {submitAttempted && Object.keys(errors).length > 0 && (
+              {submitAttempted && errorCount > 0 && (
                 <div className="flex items-center gap-2 border border-red-800 bg-red-900/10 p-3">
                   <AlertCircle
                     size={13}
                     className="text-red-400 flex-shrink-0"
                   />
                   <p className="text-red-400 text-xs">
-                    Please fix {Object.keys(errors).length} error
-                    {Object.keys(errors).length > 1 ? "s" : ""} before placing
-                    your order.
+                    Please fix {errorCount} error{errorCount > 1 ? "s" : ""}{" "}
+                    before placing your order.
                   </p>
                 </div>
               )}
