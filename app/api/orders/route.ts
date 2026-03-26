@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/mongoose";
 import { Order } from "@/models/Order";
+import { Product } from "@/models/Product";
 import { verify } from "jsonwebtoken";
 
 function getUserFromBearer(req: NextRequest) {
@@ -56,7 +57,43 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
     const body = await req.json();
-    const order = await Order.create({ ...body, user: user.id });
+
+    // Mobile sends: { items: [{productId, quantity, size}], address, phone, paymentMethod, notes }
+    // We need to look up each product and build the full items array
+    const resolvedItems = await Promise.all(
+      body.items.map(
+        async (item: { productId: string; quantity: number; size: string }) => {
+          const product = (await Product.findById(
+            item.productId,
+          ).lean()) as any;
+          if (!product) throw new Error(`Product not found: ${item.productId}`);
+          return {
+            product: product._id,
+            name: product.name,
+            price: product.price,
+            image: product.images?.[0] || "",
+            quantity: item.quantity,
+            size: item.size,
+          };
+        },
+      ),
+    );
+
+    const total = resolvedItems.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    );
+
+    const order = await Order.create({
+      user: user.id,
+      items: resolvedItems,
+      total,
+      address: body.address,
+      phone: body.phone,
+      paymentMethod: body.paymentMethod,
+      notes: body.notes || "",
+    });
+
     return NextResponse.json(order, { status: 201 });
   } catch (err) {
     console.error("Orders POST error:", err);
