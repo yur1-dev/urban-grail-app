@@ -138,6 +138,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/orders")
@@ -152,21 +153,26 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
   async function handleCancel(orderId: string) {
     if (!confirm("Are you sure you want to cancel this order?")) return;
     setCancelling(orderId);
+    setCancelError(null);
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "cancelled" }),
+      // Use the dedicated cancel endpoint — not PATCH which is admin/rider only
+      const res = await fetch(`/api/orders/${orderId}/cancel`, {
+        method: "POST",
       });
+      const data = await res.json();
       if (res.ok) {
         setOrders((prev) =>
           prev.map((o) =>
             o._id === orderId ? { ...o, status: "cancelled" } : o,
           ),
         );
+      } else {
+        setCancelError(data.error || "Failed to cancel order");
+        setTimeout(() => setCancelError(null), 4000);
       }
     } catch {
-      // silently fail
+      setCancelError("Something went wrong. Please try again.");
+      setTimeout(() => setCancelError(null), 4000);
     } finally {
       setCancelling(null);
     }
@@ -200,6 +206,14 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           </div>
         </div>
       )}
+
+      {cancelError && (
+        <div className="border border-red-800 bg-red-900/10 p-3 mb-4 flex items-center gap-2">
+          <AlertCircle size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-red-400 text-xs">{cancelError}</p>
+        </div>
+      )}
+
       <div className="flex gap-2 mb-6 flex-wrap">
         {[
           "all",
@@ -251,7 +265,8 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
           {filtered.map((order) => {
             const stepIndex = STATUS_STEPS.indexOf(order.status);
             const isCancelled = order.status === "cancelled";
-            const isPending = order.status === "pending";
+            const isCancellable =
+              order.status === "pending" || order.status === "processing";
 
             return (
               <div
@@ -366,7 +381,10 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     <span>
                       Payment:{" "}
                       <span className="text-white uppercase tracking-widest">
-                        {order.paymentMethod === "online" ? "GCash" : "COD"}
+                        {order.paymentMethod === "online" ||
+                        order.paymentMethod === "gcash"
+                          ? "GCash"
+                          : "COD"}
                       </span>
                     </span>
                     <span>
@@ -378,7 +396,7 @@ function OrdersTab({ justOrdered }: { justOrdered: boolean }) {
                     </span>
                   </div>
 
-                  {isPending && (
+                  {isCancellable && (
                     <button
                       onClick={() => handleCancel(order._id)}
                       disabled={cancelling === order._id}
