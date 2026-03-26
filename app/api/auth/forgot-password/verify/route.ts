@@ -7,7 +7,7 @@ import { hash } from "bcryptjs";
 import { sign } from "jsonwebtoken";
 import { connectDB } from "@/lib/mongoose";
 import { User, IUser } from "@/models/User";
-import { otpStore } from "@/app/api/auth/send-otp/route";
+import { otpStore } from "@/lib/otpStore";
 
 export async function POST(req: NextRequest) {
   try {
