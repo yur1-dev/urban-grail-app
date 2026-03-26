@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { connectDB } from "@/lib/mongoose";
 import { User, IUser } from "@/models/User";
-import { resetOtpStore } from "../send/route";
+import { resetOtpStore } from "@/lib/otpStore";
 
 export async function POST(req: NextRequest) {
   try {

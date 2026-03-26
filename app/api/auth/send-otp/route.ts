@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { connectDB } from "@/lib/mongoose";
 import { User, IUser } from "@/models/User";
-
-export const otpStore = new Map<
-  string,
-  { otp: string; expires: number; name: string }
->();
+import { otpStore } from "@/lib/otpStore";
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
