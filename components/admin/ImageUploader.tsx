@@ -1,229 +1,290 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
-import { X, Upload, Loader, Clipboard } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Upload, X, ImagePlus, Clipboard } from "lucide-react";
 
 interface Props {
   images: string[];
-  onChange: (images: string[]) => void;
+  onChange: (imgs: string[]) => void;
+  maxImages?: number;
 }
 
-export function ImageUploader({ images, onChange }: Props) {
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
-  const [pasteHint, setPasteHint] = useState(false);
+// Compress + convert any image to JPEG, max 1200px wide, 85% quality
+async function compressImage(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1200;
+      let { width, height } = img;
+      if (width > MAX) {
+        height = Math.round((height * MAX) / width);
+        width = MAX;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+export function ImageUploader({ images, onChange, maxImages = 5 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [pasteReady, setPasteReady] = useState(false);
+  const [error, setError] = useState("");
 
-  // ── Ctrl+V paste anywhere on the page ────────────────────────────────────
+  // Listen for paste anywhere on the page
   useEffect(() => {
-    async function handlePaste(e: ClipboardEvent) {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-
-      const imageItems = Array.from(items).filter((item) =>
-        item.type.startsWith("image/"),
-      );
+    async function onPaste(e: ClipboardEvent) {
+      const items = Array.from(e.clipboardData?.items || []);
+      const imageItems = items.filter((i) => i.type.startsWith("image/"));
       if (imageItems.length === 0) return;
-
       e.preventDefault();
-      const files = imageItems
-        .map((item) => item.getAsFile())
-        .filter(Boolean) as File[];
-
-      if (files.length > 0) {
-        setPasteHint(true);
-        setTimeout(() => setPasteHint(false), 1500);
-        await uploadFiles(files);
+      if (images.length >= maxImages) {
+        setError(`Max ${maxImages} images allowed`);
+        return;
+      }
+      setProcessing(true);
+      setError("");
+      try {
+        const blobs = imageItems
+          .map((i) => i.getAsFile())
+          .filter(Boolean) as File[];
+        const compressed = await Promise.all(
+          blobs.slice(0, maxImages - images.length).map(compressImage),
+        );
+        onChange([...images, ...compressed]);
+      } catch {
+        setError("Failed to process pasted image");
+      } finally {
+        setProcessing(false);
       }
     }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [images, onChange, maxImages]);
 
-    window.addEventListener("paste", handlePaste);
-    return () => window.removeEventListener("paste", handlePaste);
-  }, [images]); // re-register when images changes so closure is fresh
+  // Drag and drop
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(true);
+  }, []);
+  const onDragLeave = useCallback(() => setDragging(false), []);
+  const onDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      const files = Array.from(e.dataTransfer.files).filter((f) =>
+        f.type.startsWith("image/"),
+      );
+      if (!files.length) return;
+      if (images.length >= maxImages) {
+        setError(`Max ${maxImages} images allowed`);
+        return;
+      }
+      setProcessing(true);
+      setError("");
+      try {
+        const compressed = await Promise.all(
+          files.slice(0, maxImages - images.length).map(compressImage),
+        );
+        onChange([...images, ...compressed]);
+      } catch {
+        setError("Failed to process image");
+      } finally {
+        setProcessing(false);
+      }
+    },
+    [images, onChange, maxImages],
+  );
 
-  async function uploadFiles(files: File[]) {
-    setUploading(true);
+  // File input
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (!files.length) return;
+    if (images.length >= maxImages) {
+      setError(`Max ${maxImages} images allowed`);
+      return;
+    }
+    setProcessing(true);
     setError("");
-    const uploaded: string[] = [];
-
-    for (const file of files) {
-      if (
-        ![
-          "image/jpeg",
-          "image/jpg",
-          "image/png",
-          "image/webp",
-          "image/gif",
-        ].includes(file.type)
-      ) {
-        setError(`"${file.name}" is not a supported image type`);
-        continue;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setError(`"${file.name}" is too large (max 5MB)`);
-        continue;
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (res.ok) uploaded.push(data.url);
-      else setError(data.error || "Upload failed");
+    try {
+      const compressed = await Promise.all(
+        files.slice(0, maxImages - images.length).map(compressImage),
+      );
+      onChange([...images, ...compressed]);
+    } catch {
+      setError("Failed to process image");
+    } finally {
+      setProcessing(false);
+      e.target.value = "";
     }
-
-    if (uploaded.length > 0) onChange([...images, ...uploaded]);
-    setUploading(false);
   }
 
-  function handleFiles(files: FileList | null) {
-    if (!files || files.length === 0) return;
-    uploadFiles(Array.from(files));
-  }
-
-  function removeImage(index: number) {
+  function remove(index: number) {
     onChange(images.filter((_, i) => i !== index));
   }
 
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    handleFiles(e.dataTransfer.files);
-  }
-
-  function moveImage(from: number, to: number) {
+  function move(from: number, to: number) {
     const next = [...images];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
     onChange(next);
   }
 
+  const canAdd = images.length < maxImages;
+
   return (
-    <div className="space-y-3" ref={containerRef}>
-      {/* Image previews */}
-      {images.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
-          {images.map((img, i) => (
-            <div
-              key={i}
-              className="relative aspect-square bg-[#1e1e1e] overflow-hidden group border border-[#1e1e1e] hover:border-[#c9a84c]/40 transition-colors"
-            >
-              <img src={img} alt="" className="w-full h-full object-cover" />
-
-              {/* Remove button */}
-              <button
-                type="button"
-                onClick={() => removeImage(i)}
-                className="absolute top-1 right-1 bg-black/80 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-              >
-                <X size={10} />
-              </button>
-
-              {/* Main badge */}
-              {i === 0 && (
-                <span className="absolute bottom-1 left-1 bg-[#c9a84c] text-[#0a0a0a] text-[9px] font-black px-1.5 py-0.5 uppercase tracking-wider">
-                  Main
-                </span>
-              )}
-
-              {/* Move left/right arrows */}
-              <div className="absolute inset-x-0 bottom-0 flex justify-between px-1 pb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {i > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => moveImage(i, i - 1)}
-                    className="bg-black/70 text-white text-[10px] px-1.5 py-0.5 hover:bg-[#c9a84c] hover:text-[#0a0a0a] transition-colors"
-                  >
-                    ←
-                  </button>
-                )}
-                {i < images.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => moveImage(i, i + 1)}
-                    className="bg-black/70 text-white text-[10px] px-1.5 py-0.5 hover:bg-[#c9a84c] hover:text-[#0a0a0a] transition-colors ml-auto"
-                  >
-                    →
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+    <div className="space-y-3">
       {/* Drop zone */}
       <div
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-        onClick={() => inputRef.current?.click()}
-        className={`border border-dashed transition-colors p-8 text-center cursor-pointer group relative ${
-          pasteHint
+        ref={dropRef}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onClick={() => canAdd && inputRef.current?.click()}
+        className={`relative border-2 border-dashed transition-all ${
+          dragging
             ? "border-[#c9a84c] bg-[#c9a84c]/5"
-            : "border-[#3a3a3a] hover:border-[#c9a84c]"
-        }`}
+            : canAdd
+              ? "border-[#2a2a2a] hover:border-[#c9a84c]/50 cursor-pointer"
+              : "border-[#1a1a1a] cursor-not-allowed opacity-60"
+        } p-8 flex flex-col items-center justify-center gap-3 text-center min-h-[140px]`}
       >
+        {processing ? (
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-2 border-[#c9a84c] border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-[#5a5a5a] tracking-widest uppercase">
+              Processing image...
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 border border-[#2a2a2a] flex items-center justify-center">
+                <Upload size={16} className="text-[#5a5a5a]" />
+              </div>
+              <div className="w-10 h-10 border border-[#2a2a2a] flex items-center justify-center">
+                <Clipboard size={16} className="text-[#5a5a5a]" />
+              </div>
+              <div className="w-10 h-10 border border-[#2a2a2a] flex items-center justify-center">
+                <ImagePlus size={16} className="text-[#5a5a5a]" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-white font-medium">
+                {dragging ? "Drop image here" : "Click, drag & drop, or paste"}
+              </p>
+              <p className="text-[11px] text-[#5a5a5a] mt-1">
+                PNG, JPG, JPEG — auto-compressed · {images.length}/{maxImages}{" "}
+                uploaded
+              </p>
+              <p className="text-[10px] text-[#c9a84c]/70 mt-1 tracking-wider">
+                💡 Copy any image and press Ctrl+V / Cmd+V to paste directly
+              </p>
+            </div>
+          </>
+        )}
         <input
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
+          accept="image/png,image/jpeg,image/jpg,image/webp"
           multiple
           className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={onFileChange}
         />
-
-        {uploading ? (
-          <div className="flex flex-col items-center gap-2 text-[#5a5a5a]">
-            <Loader size={20} className="animate-spin text-[#c9a84c]" />
-            <p className="text-xs tracking-widest uppercase">Uploading...</p>
-          </div>
-        ) : pasteHint ? (
-          <div className="flex flex-col items-center gap-2 text-[#c9a84c]">
-            <Clipboard size={20} />
-            <p className="text-xs tracking-widest uppercase">Image pasted!</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-3 text-[#5a5a5a] group-hover:text-white transition-colors">
-            <Upload size={20} />
-            <div>
-              <p className="text-xs tracking-widest uppercase font-medium">
-                Click or drag images here
-              </p>
-              <p className="text-[10px] text-[#3a3a3a] mt-1">
-                JPG, PNG, WebP · Max 5MB each
-              </p>
-            </div>
-            {/* Ctrl+V hint */}
-            <div className="flex items-center gap-2 mt-1 border border-[#2a2a2a] px-3 py-1.5">
-              <Clipboard size={11} className="text-[#3a3a3a]" />
-              <span className="text-[10px] tracking-[2px] text-[#3a3a3a]">
-                Or press{" "}
-                <kbd className="bg-[#1e1e1e] text-[#5a5a5a] px-1.5 py-0.5 text-[9px] font-mono">
-                  Ctrl+V
-                </kbd>{" "}
-                to paste a copied image
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Tips */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
-        <p className="text-[10px] text-[#3a3a3a]">
-          💡 First image = main product photo
-        </p>
-        <p className="text-[10px] text-[#3a3a3a]">↔ Hover image to reorder</p>
-        <p className="text-[10px] text-[#3a3a3a]">
-          📋 Ctrl+V works anywhere on the page
-        </p>
-      </div>
-
+      {/* Error */}
       {error && (
-        <p className="text-red-400 text-xs flex items-center gap-1.5">
-          <X size={11} /> {error}
+        <p className="text-red-400 text-[11px] flex items-center gap-1.5">
+          <span className="text-red-400">✕</span> {error}
+        </p>
+      )}
+
+      {/* Image previews */}
+      {images.length > 0 && (
+        <div className="grid grid-cols-5 gap-2">
+          {images.map((src, i) => (
+            <div
+              key={i}
+              className="relative group aspect-square bg-[#1e1e1e] overflow-hidden"
+            >
+              <img
+                src={src}
+                alt={`Image ${i + 1}`}
+                className="w-full h-full object-cover"
+              />
+
+              {/* Main badge */}
+              {i === 0 && (
+                <div className="absolute top-1 left-1 bg-[#c9a84c] text-[#0a0a0a] text-[8px] font-black tracking-wider px-1.5 py-0.5 uppercase">
+                  Main
+                </div>
+              )}
+
+              {/* Overlay controls */}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  className="w-7 h-7 bg-red-600 hover:bg-red-500 flex items-center justify-center transition-colors cursor-pointer"
+                  title="Remove"
+                >
+                  <X size={12} className="text-white" />
+                </button>
+                <div className="flex gap-1">
+                  {i > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => move(i, i - 1)}
+                      className="w-6 h-6 bg-[#2a2a2a] hover:bg-[#3a3a3a] flex items-center justify-center text-[10px] text-white transition-colors cursor-pointer"
+                      title="Move left"
+                    >
+                      ←
+                    </button>
+                  )}
+                  {i < images.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={() => move(i, i + 1)}
+                      className="w-6 h-6 bg-[#2a2a2a] hover:bg-[#3a3a3a] flex items-center justify-center text-[10px] text-white transition-colors cursor-pointer"
+                      title="Move right"
+                    >
+                      →
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add more slot */}
+          {canAdd && (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="aspect-square border-2 border-dashed border-[#2a2a2a] hover:border-[#c9a84c]/50 flex items-center justify-center text-[#3a3a3a] hover:text-[#c9a84c] transition-colors cursor-pointer"
+            >
+              <ImagePlus size={20} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {images.length > 0 && (
+        <p className="text-[10px] text-[#3a3a3a] tracking-wider">
+          First image is the main display. Use ← → arrows to reorder.
         </p>
       )}
     </div>
