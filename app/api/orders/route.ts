@@ -58,15 +58,44 @@ export async function POST(req: NextRequest) {
     await connectDB();
     const body = await req.json();
 
-    // Mobile sends: { items: [{productId, quantity, size}], address, phone, paymentMethod, notes }
-    // We need to look up each product and build the full items array
     const resolvedItems = await Promise.all(
       body.items.map(
-        async (item: { productId: string; quantity: number; size: string }) => {
-          const product = (await Product.findById(
-            item.productId,
-          ).lean()) as any;
-          if (!product) throw new Error(`Product not found: ${item.productId}`);
+        async (item: {
+          // Mobile format
+          productId?: string;
+          // Web format
+          product?: string;
+          // Shared
+          quantity: number;
+          size: string;
+          price?: number;
+          name?: string;
+          image?: string;
+        }) => {
+          // Web sends: { product, quantity, size, price, name, image }
+          // Mobile sends: { productId, quantity, size }
+          const productId = item.product || item.productId;
+
+          if (!productId) {
+            throw new Error("Missing product ID in order item");
+          }
+
+          // If the web already sent price/name/image, use them directly
+          // to avoid an unnecessary DB lookup
+          if (item.price && item.name) {
+            return {
+              product: productId,
+              name: item.name,
+              price: item.price,
+              image: item.image || "",
+              quantity: item.quantity,
+              size: item.size,
+            };
+          }
+
+          // Mobile path: look up product from DB
+          const product = (await Product.findById(productId).lean()) as any;
+          if (!product) throw new Error(`Product not found: ${productId}`);
           return {
             product: product._id,
             name: product.name,
@@ -79,10 +108,9 @@ export async function POST(req: NextRequest) {
       ),
     );
 
-    const total = resolvedItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    );
+    const total =
+      body.total ??
+      resolvedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     const order = await Order.create({
       user: user.id,
@@ -92,6 +120,7 @@ export async function POST(req: NextRequest) {
       phone: body.phone,
       paymentMethod: body.paymentMethod,
       notes: body.notes || "",
+      recipientName: body.recipientName || "",
     });
 
     return NextResponse.json(order, { status: 201 });

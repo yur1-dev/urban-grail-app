@@ -39,6 +39,7 @@ const OrderSchema = new Schema(
     xenditInvoiceUrl: { type: String },
     address: { type: String, required: true },
     phone: { type: String, required: true },
+    recipientName: { type: String, default: "" },
     notes: { type: String },
     assignedRider: { type: Schema.Types.ObjectId, ref: "User", default: null },
     deliveryProof: { type: String, default: null },
