@@ -24,7 +24,20 @@ export async function POST(req: NextRequest) {
       user = session.user as any;
     }
 
-    const { amount, orderId, customerName, customerEmail } = await req.json();
+    const { amount, orderId, customerName, customerEmail, source } =
+      await req.json();
+
+    // Use deep link for mobile, web URL for web
+    const isMobile = source === "mobile";
+    const mobileScheme = process.env.MOBILE_APP_SCHEME || "manus20260326111125";
+
+    const successRedirect = isMobile
+      ? `${mobileScheme}://payment/success?orderId=${orderId}`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/account?success=1`;
+
+    const failureRedirect = isMobile
+      ? `${mobileScheme}://payment/failed?orderId=${orderId}`
+      : `${process.env.NEXT_PUBLIC_APP_URL}/checkout?failed=1`;
 
     const response = await fetch("https://api.xendit.co/v2/invoices", {
       method: "POST",
@@ -42,8 +55,8 @@ export async function POST(req: NextRequest) {
           given_names: customerName || "Customer",
           email: customerEmail || "",
         },
-        success_redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/account?success=1`,
-        failure_redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/checkout?failed=1`,
+        success_redirect_url: successRedirect,
+        failure_redirect_url: failureRedirect,
         payment_methods: ["GCASH"],
       }),
     });
