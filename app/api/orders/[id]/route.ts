@@ -2,15 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { connectDB } from "@/lib/mongoose";
 import { Order } from "@/models/Order";
+import { verify } from "jsonwebtoken";
+
+function getUserFromBearer(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  try {
+    const token = authHeader.slice(7);
+    const decoded = verify(token, process.env.NEXTAUTH_SECRET!) as any;
+    return {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role || "customer",
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getUser(req: NextRequest) {
+  const bearer = getUserFromBearer(req);
+  if (bearer) return bearer;
+  const session = await auth();
+  if (!session) return null;
+  return session.user as any;
+}
 
 export async function GET(
-  _: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session)
+    const user = await getUser(req);
+    if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { id } = await params;
     await connectDB();
     const order = await Order.findById(id)
@@ -31,13 +57,13 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session)
+    const user = await getUser(req);
+    if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const role = (session.user as any)?.role;
+    const role = user.role;
     if (role !== "admin" && role !== "rider") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -52,11 +78,10 @@ export async function PATCH(
     if (assignedRider !== undefined) updateData.assignedRider = assignedRider;
 
     if (role === "rider") {
-      const userId = (session.user as any)?.id;
       const existing = (await Order.findById(id).lean()) as any;
       if (!existing)
         return NextResponse.json({ error: "Not found" }, { status: 404 });
-      if (existing.assignedRider?.toString() !== userId) {
+      if (existing.assignedRider?.toString() !== user.id) {
         return NextResponse.json({ error: "Not your order" }, { status: 403 });
       }
       if (status && !["shipped", "delivered"].includes(status)) {
